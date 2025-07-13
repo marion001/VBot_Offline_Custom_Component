@@ -26,6 +26,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "optimistic": False,
             "qos": 1,
             "retain": True,
+            "icon": "mdi:math-log"
         },
     ]
     ents = [MQTTSwitch(hass, **s) for s in switches]
@@ -37,6 +38,7 @@ class MQTTSwitch(SwitchEntity):
         self._name = name
         self._attr_unique_id = f"{state_topic}_switch"
         self._attr_device_class = "switch"
+        self._attr_icon = icon
         self._state_topic = state_topic
         self._command_topic = command_topic
         self._payload_on = payload_on
@@ -55,7 +57,6 @@ class MQTTSwitch(SwitchEntity):
             self._message_received,
             self._qos
         )
-
 
     @property
     def name(self):
