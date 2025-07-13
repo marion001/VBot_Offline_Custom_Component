@@ -1,8 +1,8 @@
 {
   "domain": "vbot_assistant_mqtt",
   "name": "VBot Assistant MQTT",
-  "version": "1.0.0",
-  "documentation": "https://github.com/yourname/vbot_assistant_mqtt",
+  "version": "1.0.1",
+  "documentation": "https://github.com/marion001/VBot-Assistant-MQTT-HASS",
   "requirements": [],
   "dependencies": ["mqtt"],
   "codeowners": ["@marion001"],
