@@ -9,7 +9,7 @@ async def async_setup_entry(hass, entry):
     hass.data[DOMAIN][entry.entry_id] = entry.data
     await hass.config_entries.async_forward_entry_setups(
         #entry, ["switch", "number", "sensor", "select", "script", "input_text"]
-        entry, ["switch", "number", "sensor", "select", "button", "input_text_entity"]
+        entry, ["switch", "number", "sensor", "select", "button"]
     )
     return True
 
@@ -17,7 +17,7 @@ async def async_setup_entry(hass, entry):
 async def async_unload_entry(hass, entry):
     await hass.config_entries.async_unload_platforms(
         #entry, ["switch", "number", "sensor", "select", "script", "input_text"]
-        entry, ["switch", "number", "sensor", "select", "button", "input_text_entity"]
+        entry, ["switch", "number", "sensor", "select", "button"]
     )
     hass.data[DOMAIN].pop(entry.entry_id)
     return True
