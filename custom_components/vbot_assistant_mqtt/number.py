@@ -21,6 +21,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "min_value": 0,
             "max_value": 100,
             "unit_of_measurement": "%",
+            "icon": "mdi:volume-source"
             "qos": 1,
         },
         {
@@ -30,6 +31,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "min_value": 0,
             "max_value": 255,
             "unit_of_measurement": None,
+            "icon": "mdi:brightness-5"
             "qos": 1,
         },
     ]
@@ -47,7 +49,6 @@ class MQTTNumber(NumberEntity):
         self._qos = qos
         self._unit = unit_of_measurement
         self._value = None
-        #self._attr_icon = icon
         self._attr_icon = icon or "mdi:tune"
         self._attr_native_min_value = min_value
         self._attr_native_max_value = max_value
