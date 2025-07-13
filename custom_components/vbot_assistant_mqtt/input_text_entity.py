@@ -60,9 +60,9 @@ class VBotInputTextEntity(InputTextEntity):
         return {
             "identifiers": {(DOMAIN, self._device)},
             "name": self._device,
-            "name": f"{self._device} VBot Assistant InputText",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT InputText",
+            "model": "VBot Assistant MQTT",
         }
 
     async def async_set_value(self, value: str) -> None:

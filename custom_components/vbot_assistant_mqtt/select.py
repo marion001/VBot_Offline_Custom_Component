@@ -73,9 +73,9 @@ class MQTTSelect(SelectEntity):
             return None
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assistant Select",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT Select"
+            "model": "VBot Assistant MQTT"
         }
 
     async def async_select_option(self, option):

@@ -79,9 +79,9 @@ class MQTTNumber(NumberEntity):
         return {
             "identifiers": {(DOMAIN, self._device)},
             "name": self._device,
-            "name": f"{self._device} VBot Assistant Number",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT Number",
+            "model": "VBot Assistant MQTT",
         }
 
     async def async_set_native_value(self, value):

@@ -441,9 +441,9 @@ class MQTTSwitch(SwitchEntity):
             return None
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assistant Switch",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT Switch"
+            "model": "VBot Assistant MQTT"
         }
 
     async def async_turn_on(self, **kwargs):

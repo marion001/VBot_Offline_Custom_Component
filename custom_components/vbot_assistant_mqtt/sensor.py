@@ -80,7 +80,7 @@ class MQTTSensor(SensorEntity):
             return None
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assistant Sensor",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT Sensor"
+            "model": "VBot Assistant MQTT"
         }

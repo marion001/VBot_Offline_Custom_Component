@@ -211,7 +211,7 @@ class VBotMQTTButton(ButtonEntity):
             return None
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assistant Button",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT Button"
+            "model": "VBot Assistant MQTT"
         }

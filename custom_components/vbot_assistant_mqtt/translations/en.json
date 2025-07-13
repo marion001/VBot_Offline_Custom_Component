@@ -3,10 +3,10 @@
   "config": {
     "step": {
       "user": {
-        "title": "Thiết lập VBot Assistant MQTT",
-        "description": "Nhập Tên Client tương ứng trong Cấu Hình Config MQTT của loa VBot",
+        "title": "Liên Kết VBot Assistant MQTT",
+        "description": "Nhập Tên Client tương ứng trong (Cấu Hình Config MQTT) của loa VBot",
         "data": {
-          "device_id": "Tên Client"
+          "device_id": "Tên Client MQTT Của Loa VBot"
         }
       }
     }
