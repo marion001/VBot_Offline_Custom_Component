@@ -20,7 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "command_topic": f"{device}/number/volume/set",
             "min_value": 0,
             "max_value": 100,
-            "unit": "%",
+            "unit_of_measurement": "%",
             "qos": 1,
         },
         {
@@ -29,7 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "command_topic": f"{device}/number/led_brightness/set",
             "min_value": 0,
             "max_value": 255,
-            "unit": None,
+            "unit_of_measurement": None,
             "qos": 1,
         },
     ]

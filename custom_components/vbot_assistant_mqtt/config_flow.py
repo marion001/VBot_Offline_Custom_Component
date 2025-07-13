@@ -13,5 +13,5 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.device_id = user_input[CONF_DEVICE_ID].strip()
             return self.async_create_entry(title=self.device_id, data={CONF_DEVICE_ID: self.device_id})
 
-        schema = vol.Schema({vol.Required(CONF_DEVICE_ID, default="VBot_DEV1"): str})
+        schema = vol.Schema({vol.Required(CONF_DEVICE_ID, default="VBot"): str})
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
