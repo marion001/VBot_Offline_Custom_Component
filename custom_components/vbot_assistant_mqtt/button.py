@@ -144,7 +144,6 @@ async def async_setup_entry(
         }
     ]
 
-
     entities = []
     for btn in buttons_config:
         entities.append(
@@ -161,7 +160,6 @@ async def async_setup_entry(
         )
 
     async_add_entities(entities)
-
 
 class VBotMQTTButton(ButtonEntity):
     def __init__(
