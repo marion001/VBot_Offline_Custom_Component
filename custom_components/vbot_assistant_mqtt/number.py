@@ -37,48 +37,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(ents, update_before_add=True)
 
 class MQTTNumber(NumberEntity):
-    def __init__(self, hass, name, state_topic, command_topic, min, max, unit, qos):
+    def __init__(self, hass, name, state_topic, command_topic, min_value, max_value, qos, unit_of_measurement, icon):
         self._hass = hass
         self._name = name
         self._state_topic = state_topic
         self._command_topic = command_topic
-        self._min = min
-        self._max = max
-        self._unit = unit
+        self._min_value = min_value
+        self._max_value = max_value
         self._qos = qos
+        self._unit = unit_of_measurement
         self._value = None
+        self._attr_icon = icon
+        self._attr_native_min_value = min_value
+        self._attr_native_max_value = max_value
+        self._attr_native_unit_of_measurement = unit_of_measurement
 
-        mqtt.async_subscribe(hass, self._state_topic, self._message_received, self._qos)
+    async def async_added_to_hass(self):
+        await mqtt.async_subscribe(
+            self._hass,
+            self._state_topic,
+            self._message_received,
+            self._qos
+        )
 
     @property
     def name(self):
         return self._name
 
     @property
-    def unit_of_measurement(self):
-        return self._unit
-
-    @property
-    def min_value(self):
-        return self._min
-
-    @property
-    def max_value(self):
-        return self._max
-
-    @property
-    def value(self):
+    def native_value(self):
         return self._value
 
-    async def async_set_value(self, value):
-        await mqtt.async_publish(self._hass, self._command_topic, str(value), self._qos)
-        self._value = value
+    async def async_set_native_value(self, value):
+        await mqtt.async_publish(self._hass, self._command_topic, str(value), self._qos, False)
+        self._value = value  # nếu optimistic
         self.async_write_ha_state()
 
     async def _message_received(self, msg):
+        payload = msg.payload  # KHÔNG dùng .decode()
         try:
-            val = float(msg.payload.decode())
-            self._value = val
+            self._value = float(payload)
             self.async_write_ha_state()
         except ValueError:
-            _LOGGER.warning(f"{self._name} received invalid value: {msg.payload}")
+            _LOGGER.warning(f"Invalid payload for {self._name}: {payload}")
