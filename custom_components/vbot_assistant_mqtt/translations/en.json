@@ -1,0 +1,14 @@
+{
+  "title": "VBot Assistant MQTT",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thiết lập VBot Device",
+        "description": "Nhập Device ID mà bạn muốn tích hợp.",
+        "data": {
+          "device_id": "Device ID"
+        }
+      }
+    }
+  }
+}
