@@ -60,11 +60,12 @@ class VBotInputTextEntity(InputTextEntity):
         return {
             "identifiers": {(DOMAIN, self._device)},
             "name": self._device,
-            "manufacturer": "VBot",
-            "model": "MQTT InputText",
+            "name": f"{self._device} VBot Assistant InputText",
+            "manufacturer": "Vũ Tuyển",
+            "model": "VBot Assistant MQTT InputText",
         }
 
     async def async_set_value(self, value: str) -> None:
-        _LOGGER.debug("Setting value of %s to %s", self._attr_unique_id, value)
+        _LOGGER.debug("Thiết lập giá trị của %s thành %s", self._attr_unique_id, value)
         self._attr_native_value = value
         self.async_write_ha_state()

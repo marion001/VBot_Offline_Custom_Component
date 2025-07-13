@@ -44,9 +44,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class MQTTSensor(SensorEntity):
-    def __init__(self, hass, name, state_topic, icon=None):
+    def __init__(self, hass, name, state_topic, icon=None, device=None):
         self._hass = hass
         self._name = name
+        self._device = device
         self._state_topic = state_topic
         self._attr_icon = icon or "mdi:tune"
         self._state = None
@@ -72,3 +73,14 @@ class MQTTSensor(SensorEntity):
     @property
     def state(self):
         return self._state
+
+    @property
+    def device_info(self):
+        if not self._device:
+            return None
+        return {
+            "identifiers": {(DOMAIN, self._device)},
+            "name": f"{self._device} VBot Assistant Sensor",
+            "manufacturer": "Vũ Tuyển",
+            "model": "VBot Assistant MQTT Sensor"
+        }

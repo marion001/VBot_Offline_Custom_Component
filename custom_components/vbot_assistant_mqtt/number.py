@@ -42,9 +42,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(ents, update_before_add=True)
 
 class MQTTNumber(NumberEntity):
-    def __init__(self, hass, name, state_topic, command_topic, min_value, max_value, qos, unit_of_measurement, icon=None):
+    def __init__(self, hass, name, state_topic, command_topic, min_value, max_value, qos, unit_of_measurement, icon=None, device=None):
         self._hass = hass
         self._name = name
+        self._device = device
         self._state_topic = state_topic
         self._command_topic = command_topic
         self._min_value = min_value
@@ -73,6 +74,16 @@ class MQTTNumber(NumberEntity):
     def native_value(self):
         return self._value
 
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._device)},
+            "name": self._device,
+            "name": f"{self._device} VBot Assistant Number",
+            "manufacturer": "Vũ Tuyển",
+            "model": "VBot Assistant MQTT Number",
+        }
+
     async def async_set_native_value(self, value):
         await mqtt.async_publish(self._hass, self._command_topic, str(value), self._qos, False)
         self._value = value
@@ -84,4 +95,4 @@ class MQTTNumber(NumberEntity):
             self._value = float(payload)
             self.async_write_ha_state()
         except ValueError:
-            _LOGGER.warning(f"Invalid payload for {self._name}: {payload}")
+            _LOGGER.warning(f"Tải dữ liệu không hợp lệ cho {self._name}: {payload}")

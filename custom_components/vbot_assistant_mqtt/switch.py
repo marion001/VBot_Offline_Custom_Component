@@ -400,9 +400,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(ents, update_before_add=True)
 
 class MQTTSwitch(SwitchEntity):
-    def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain, icon=None):
+    def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain, icon=None, device=None):
         self._hass = hass
         self._name = name
+        self._device = device
         self._attr_unique_id = f"{state_topic}_switch"
         self._attr_device_class = "switch"
         self._attr_icon = icon or "mdi:dip-switch"
@@ -432,6 +433,17 @@ class MQTTSwitch(SwitchEntity):
     @property
     def is_on(self):
         return self._is_on
+
+    @property
+    def device_info(self):
+        if not self._device:
+            return None
+        return {
+            "identifiers": {(DOMAIN, self._device)},
+            "name": f"{self._device} VBot Assistant Switch",
+            "manufacturer": "Vũ Tuyển",
+            "model": "VBot Assistant MQTT Switch"
+        }
 
     async def async_turn_on(self, **kwargs):
         await mqtt.async_publish(self._hass, self._command_topic, self._payload_on, self._qos, self._retain)
