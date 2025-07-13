@@ -8,14 +8,14 @@ async def async_setup_entry(hass, entry):
     hass.data[DOMAIN][entry.entry_id] = entry.data
     #Thêm các platform entry_id cần dùng
     await hass.config_entries.async_forward_entry_setups(
-        entry, ["switch", "number", "sensor", "select", "script", "input_text"]
+        entry, ["vbot_switch", "vbot_number", "vbot_sensor", "vbot_select", "vbot_script", "vbot_input_text"]
     )
     return True
 
 async def async_unload_entry(hass, entry):
     #Gỡ tất cả các platform entry_id đã thêm vào trước đó
     await hass.config_entries.async_unload_platforms(
-        entry, ["switch", "number", "sensor", "select", "script", "input_text"]
+        entry, ["vbot_switch", "vbot_number", "vbot_sensor", "vbot_select", "vbot_script", "vbot_input_text"]
     )
     hass.data[DOMAIN].pop(entry.entry_id)
     return True
