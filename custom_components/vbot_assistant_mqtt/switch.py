@@ -78,7 +78,7 @@ class MQTTSwitch(SwitchEntity):
             self.async_write_ha_state()
 
     async def _message_received(self, msg):
-        payload = msg.payload.decode()
+        payload = msg.payload
         _LOGGER.debug(f"{self._name} MQTT recv: {payload}")
         self._is_on = payload == self._state_on
         self.async_write_ha_state()
