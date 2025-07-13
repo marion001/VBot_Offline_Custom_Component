@@ -35,6 +35,8 @@ class MQTTSwitch(SwitchEntity):
     def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain):
         self._hass = hass
         self._name = name
+        self._attr_unique_id = f"{state_topic}_switch"
+        self._attr_device_class = "switch"
         self._state_topic = state_topic
         self._command_topic = command_topic
         self._payload_on = payload_on
@@ -46,7 +48,14 @@ class MQTTSwitch(SwitchEntity):
         self._retain = retain
         self._is_on = False
 
-        mqtt.async_subscribe(hass, self._state_topic, self._message_received, self._qos)
+    async def async_added_to_hass(self):
+        await mqtt.async_subscribe(
+            self._hass,
+            self._state_topic,
+            self._message_received,
+            self._qos
+        )
+
 
     @property
     def name(self):
