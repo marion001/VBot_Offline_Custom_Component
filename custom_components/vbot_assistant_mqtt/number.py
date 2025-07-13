@@ -38,7 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "qos": 1,
         },
     ]
-    ents = [MQTTNumber(hass, **n) for n in numbers]
+    ents = [MQTTNumber(hass, device=device, **n) for n in numbers]
     async_add_entities(ents, update_before_add=True)
 
 class MQTTNumber(NumberEntity):

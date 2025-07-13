@@ -396,7 +396,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:assistant"
           },
     ]
-    ents = [MQTTSwitch(hass, **s) for s in switches]
+    #ents = [MQTTSwitch(hass, **s) for s in switches]
+    ents = [MQTTSwitch(hass, device=device, **s) for s in switches]
     async_add_entities(ents, update_before_add=True)
 
 class MQTTSwitch(SwitchEntity):

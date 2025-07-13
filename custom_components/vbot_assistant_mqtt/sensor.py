@@ -39,7 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         },
     ]
 
-    entities = [MQTTSensor(hass, **s) for s in sensors]
+    entities = [MQTTSensor(hass, device=device, **s) for s in sensors]
     async_add_entities(entities, update_before_add=True)
 
 

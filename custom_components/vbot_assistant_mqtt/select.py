@@ -26,7 +26,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         }
     ]
 
-    entities = [MQTTSelect(hass, **s) for s in selects]
+    entities = [MQTTSelect(hass, device=device, **s) for s in selects]
     async_add_entities(entities, update_before_add=True)
 
 
