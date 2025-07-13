@@ -21,7 +21,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "min_value": 0,
             "max_value": 100,
             "unit_of_measurement": "%",
-            "icon": "mdi:volume-source"
+            "icon": "mdi:volume-source",
             "qos": 1,
         },
         {
@@ -31,7 +31,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "min_value": 0,
             "max_value": 255,
             "unit_of_measurement": None,
-            "icon": "mdi:brightness-5"
+            "icon": "mdi:brightness-5",
             "qos": 1,
         },
     ]
