@@ -13,7 +13,10 @@ async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     cfg = entry.data
-    device = cfg[CONF_DEVICE_ID]
+    device = cfg.get(CONF_DEVICE_ID)
+    if not device:
+        _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
+        return
     switches = [
           {
             "name": f"{device} Logs Hệ Thống",
@@ -402,7 +405,6 @@ class MQTTSwitch(SwitchEntity):
         self._name = name
         self._attr_unique_id = f"{state_topic}_switch"
         self._attr_device_class = "switch"
-        #self._attr_icon = icon
         self._attr_icon = icon or "mdi:dip-switch"
         self._state_topic = state_topic
         self._command_topic = command_topic
@@ -445,6 +447,6 @@ class MQTTSwitch(SwitchEntity):
 
     async def _message_received(self, msg):
         payload = msg.payload
-        _LOGGER.debug(f"{self._name} MQTT recv: {payload}")
+        _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
         self._is_on = payload == self._state_on
         self.async_write_ha_state()

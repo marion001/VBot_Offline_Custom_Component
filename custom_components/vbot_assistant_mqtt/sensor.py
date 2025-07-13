@@ -8,12 +8,14 @@ from .const import DOMAIN, CONF_DEVICE_ID
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, discovery_info=None):
-    pass  # Not used
+    pass
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     cfg = entry.data
-    device = cfg[CONF_DEVICE_ID]
-
+    device = cfg.get(CONF_DEVICE_ID)
+    if not device:
+        _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
+        return
     sensors = [
         {
             "name": f"{device} Ngày Phát Hành Giao Diện",
@@ -46,7 +48,6 @@ class MQTTSensor(SensorEntity):
         self._hass = hass
         self._name = name
         self._state_topic = state_topic
-        #self._attr_icon = icon
         self._attr_icon = icon or "mdi:tune"
         self._state = None
 
@@ -60,7 +61,7 @@ class MQTTSensor(SensorEntity):
 
     async def _message_received(self, msg):
         payload = msg.payload
-        _LOGGER.debug(f"{self._name} MQTT recv: {payload}")
+        _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
         self._state = payload
         self.async_write_ha_state()
 

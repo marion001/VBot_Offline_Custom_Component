@@ -8,12 +8,14 @@ from .const import DOMAIN, CONF_DEVICE_ID
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, discovery_info=None):
-    pass  # Not used
+    pass
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     cfg = entry.data
-    device = cfg[CONF_DEVICE_ID]
-
+    device = cfg.get(CONF_DEVICE_ID)
+    if not device:
+        _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
+        return
     selects = [
         {
             "name": f"{device} Kiểu Hiển Thị Logs",
@@ -48,7 +50,7 @@ class MQTTSelect(SelectEntity):
 
     async def _message_received(self, msg):
         payload = msg.payload
-        _LOGGER.debug(f"{self._name} MQTT recv: {payload}")
+        _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
         self._state = payload
         self.async_write_ha_state()
 

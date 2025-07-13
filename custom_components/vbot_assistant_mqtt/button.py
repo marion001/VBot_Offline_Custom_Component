@@ -9,14 +9,13 @@ from .const import DOMAIN, CONF_DEVICE_ID
 
 _LOGGER = logging.getLogger(__name__)
 
-
 async def async_setup_platform(
     hass: HomeAssistant,
     config: dict,
     async_add_entities: AddEntitiesCallback,
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
-    # Not used when using config flow
+    #Không được sử dụng, khi sử dụng luồng cấu hình
     pass
 
 
@@ -28,7 +27,7 @@ async def async_setup_entry(
     cfg = entry.data
     device = cfg.get(CONF_DEVICE_ID)
     if not device:
-        _LOGGER.error("No device ID found in config entry")
+        _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
 
     buttons_config = [
@@ -192,14 +191,14 @@ class VBotMQTTButton(ButtonEntity):
             if state_obj:
                 payload = state_obj.state
             else:
-                _LOGGER.warning("Template input '%s' not found", self._template_input)
+                _LOGGER.warning("Không tìm thấy dữ liệu đầu vào mẫu: '%s'", self._template_input)
                 return
 
         if payload is None:
-            _LOGGER.warning("No payload to publish for button: %s", self._attr_name)
+            _LOGGER.warning("Không có nội dung nào để xuất bản cho nút: %s", self._attr_name)
             return
 
-        _LOGGER.debug("Publishing MQTT message to %s: %s", self._topic, payload)
+        _LOGGER.debug("Gửi tin nhắn MQTT tới %s: %s", self._topic, payload)
         await mqtt.async_publish(
             self._hass,
             self._topic,

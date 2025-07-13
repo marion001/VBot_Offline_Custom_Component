@@ -12,7 +12,10 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     pass
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    device = entry.data[CONF_DEVICE_ID]
+    device = entry.data.get(CONF_DEVICE_ID)
+    if not device:
+        _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
+        return
     numbers = [
         {
             "name": f"{device} Volume",
@@ -72,11 +75,11 @@ class MQTTNumber(NumberEntity):
 
     async def async_set_native_value(self, value):
         await mqtt.async_publish(self._hass, self._command_topic, str(value), self._qos, False)
-        self._value = value  # nếu optimistic
+        self._value = value
         self.async_write_ha_state()
 
     async def _message_received(self, msg):
-        payload = msg.payload  # KHÔNG dùng .decode()
+        payload = msg.payload
         try:
             self._value = float(payload)
             self.async_write_ha_state()
