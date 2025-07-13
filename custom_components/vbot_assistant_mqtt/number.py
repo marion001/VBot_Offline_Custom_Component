@@ -37,7 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(ents, update_before_add=True)
 
 class MQTTNumber(NumberEntity):
-    def __init__(self, hass, name, state_topic, command_topic, min_value, max_value, qos, unit_of_measurement, icon):
+    def __init__(self, hass, name, state_topic, command_topic, min_value, max_value, qos, unit_of_measurement, icon=None):
         self._hass = hass
         self._name = name
         self._state_topic = state_topic
@@ -47,7 +47,8 @@ class MQTTNumber(NumberEntity):
         self._qos = qos
         self._unit = unit_of_measurement
         self._value = None
-        self._attr_icon = icon
+        #self._attr_icon = icon
+        self._attr_icon = icon or "mdi:tune"
         self._attr_native_min_value = min_value
         self._attr_native_max_value = max_value
         self._attr_native_unit_of_measurement = unit_of_measurement

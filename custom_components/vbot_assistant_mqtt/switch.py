@@ -397,12 +397,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(ents, update_before_add=True)
 
 class MQTTSwitch(SwitchEntity):
-    def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain, icon):
+    def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain, icon=None):
         self._hass = hass
         self._name = name
         self._attr_unique_id = f"{state_topic}_switch"
         self._attr_device_class = "switch"
-        self._attr_icon = icon
+        #self._attr_icon = icon
+        self._attr_icon = icon or "mdi:dip-switch"
         self._state_topic = state_topic
         self._command_topic = command_topic
         self._payload_on = payload_on

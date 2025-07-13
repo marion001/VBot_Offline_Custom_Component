@@ -42,11 +42,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class MQTTSensor(SensorEntity):
-    def __init__(self, hass, name, state_topic, icon):
+    def __init__(self, hass, name, state_topic, icon=None):
         self._hass = hass
         self._name = name
         self._state_topic = state_topic
-        self._attr_icon = icon
+        #self._attr_icon = icon
+        self._attr_icon = icon or "mdi:tune"
         self._state = None
 
     async def async_added_to_hass(self):
