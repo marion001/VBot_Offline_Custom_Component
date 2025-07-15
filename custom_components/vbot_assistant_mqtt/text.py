@@ -47,7 +47,6 @@ async def async_setup_entry(
 
     async_add_entities(entities)
 
-
 class VBotTextEntity(TextEntity):  # ✅ Kế thừa TextEntity thay vì InputTextEntity
     def __init__(self, unique_id: str, name: str, device: str):
         self._attr_unique_id = unique_id
@@ -61,7 +60,7 @@ class VBotTextEntity(TextEntity):  # ✅ Kế thừa TextEntity thay vì InputTe
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assistant Text",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
             "model": "VBot Assistant MQTT",
         }
