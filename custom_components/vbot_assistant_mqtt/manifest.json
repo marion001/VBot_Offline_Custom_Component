@@ -6,5 +6,9 @@
   "requirements": [],
   "dependencies": ["mqtt"],
   "codeowners": ["@marion001"],
-  "config_flow": true
+  "config_flow": true,
+  "logos": {
+    "brand": "logo.png",
+    "icon": "icon.png"
+  }
 }
