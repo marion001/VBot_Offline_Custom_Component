@@ -40,7 +40,8 @@ async def async_setup_entry(
         entities.append(
             VBotTextEntity(
                 unique_id=inp["id"],
-                name=inp["name"],
+                #name=inp["name"],
+                name=inp["id"],
                 device=device,
             )
         )
