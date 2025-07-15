@@ -3,7 +3,7 @@ import json
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
-    MediaPlayerState
+    MediaPlayerState,
 )
 from homeassistant.components import mqtt
 from homeassistant.core import HomeAssistant
@@ -13,7 +13,11 @@ from .const import DOMAIN, CONF_DEVICE_ID
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback
+) -> None:
     device = entry.data.get(CONF_DEVICE_ID)
     if not device:
         _LOGGER.error("Không tìm thấy device_id trong cấu hình")
@@ -30,8 +34,8 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._attr_state = MediaPlayerState.IDLE
         self._attr_supported_features = (
             MediaPlayerEntityFeature.PLAY
-            | MediaPlayerEntityFeature.STOP
             | MediaPlayerEntityFeature.PAUSE
+            | MediaPlayerEntityFeature.STOP
             | MediaPlayerEntityFeature.PLAY_MEDIA
         )
         self._media_title = None
@@ -46,13 +50,15 @@ class VBotMediaPlayer(MediaPlayerEntity):
         return self._media_title
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
-        _LOGGER.info("Phát media: %s (%s)", media_id, media_type)
-        self._media_title = media_id.split("/")[-1]
         self._media_url = media_id
+        self._media_title = media_id.split("/")[-1]
         self._attr_state = MediaPlayerState.PLAYING
-        _LOGGER.debug(f"media_id: {media_id}")
 
-        # Sử dụng json.dumps để giữ nguyên HOA/thường
+        _LOGGER.info("Yêu cầu phát media:")
+        _LOGGER.info("  - Loại: %s", media_type)
+        _LOGGER.info("  - URL: %s", self._media_url)
+        _LOGGER.info("  - Tên file: %s", self._media_title)
+
         payload = {
             "action": "play",
             "media_link": self._media_url,
@@ -63,13 +69,14 @@ class VBotMediaPlayer(MediaPlayerEntity):
         await mqtt.async_publish(
             self._hass,
             f"{self._device}/script/media_control/set",
-            json.dumps(payload),  # ⬅️ Không còn lỗi chữ in hoa
+            json.dumps(payload),
             qos=1,
             retain=False
         )
         self.async_write_ha_state()
 
     async def async_media_stop(self):
+        _LOGGER.info("Dừng phát media")
         self._attr_state = MediaPlayerState.IDLE
         await mqtt.async_publish(
             self._hass,
@@ -81,6 +88,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_media_pause(self):
+        _LOGGER.info("Tạm dừng media")
         self._attr_state = MediaPlayerState.PAUSED
         await mqtt.async_publish(
             self._hass,
@@ -92,6 +100,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_media_play(self):
+        _LOGGER.info("Tiếp tục phát media")
         self._attr_state = MediaPlayerState.PLAYING
         await mqtt.async_publish(
             self._hass,

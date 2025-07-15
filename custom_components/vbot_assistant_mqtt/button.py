@@ -44,19 +44,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "payload": "RESUME"
         },
         {
-            "id": f"{device}_media_control_play",
-            "name": f"{device} Media Play",
-            "icon": "mdi:play-circle-outline",
-            "topic": f"{device}/script/media_control/set",
-            "payload": '''{
-                "action": "play",
-                "media_link": "http://localhost/1.mp3",
-                "media_cover": "http://localhost/1.jpg",
-                "media_name": "Thuyền Quyên",
-                "media_player_source": "MQTT"
-            }'''
-        },
-        {
             "id": f"{device}_volume_control_up",
             "name": f"{device} Volume UP",
             "icon": "mdi:volume-plus",

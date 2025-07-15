@@ -7,5 +7,5 @@
   "dependencies": ["mqtt"],
   "codeowners": ["@marion001"],
   "config_flow": true,
-  "platforms": ["button", "sensor", "text", "number", "select", "media_player"]
+  "platforms": ["switch", "number", "sensor", "select", "button", "text", "media_player"]
 }
