@@ -24,14 +24,17 @@ async def async_setup_entry(
         {
             "id": f"{device.lower()}_news_paper_name",
             "name": f"{device} News Paper Name",
+            "value": "Đọc báo tuổi trẻ",
         },
         {
             "id": f"{device.lower()}_main_processing",
             "name": f"{device} Main Processing",
+            "value": "Mấy giờ rồi",
         },
         {
             "id": f"{device.lower()}_vbot_tts",
             "name": f"{device} VBot TTS",
+            "value": "Chào bạn, đây là nội dung để phát thông báo",
         }
     ]
 
@@ -42,17 +45,18 @@ async def async_setup_entry(
                 unique_id=inp["id"],
                 name=inp["name"],
                 device=device,
+                initial_value=inp.get("value", "")  # ✅ dùng "value"
             )
         )
 
     async_add_entities(entities)
 
-class VBotTextEntity(TextEntity):  # ✅ Kế thừa TextEntity thay vì InputTextEntity
-    def __init__(self, unique_id: str, name: str, device: str):
+class VBotTextEntity(TextEntity):
+    def __init__(self, unique_id: str, name: str, device: str, initial_value: str = ""):
         self._attr_unique_id = unique_id
-        self._attr_name = name  # tên thân thiện
+        self._attr_name = name
         self._device = device
-        self._attr_native_value = ""
+        self._attr_native_value = initial_value  # ✅ gán giá trị ban đầu
         self._attr_min = 0
         self._attr_max = 255
 
