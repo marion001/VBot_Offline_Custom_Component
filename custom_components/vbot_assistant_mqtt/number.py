@@ -23,6 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "command_topic": f"{device}/number/volume/set",
             "min_value": 0,
             "max_value": 100,
+            "step": 1,
             "unit_of_measurement": "%",
             "icon": "mdi:volume-source",
             "qos": 1,
@@ -33,6 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "command_topic": f"{device}/number/led_brightness/set",
             "min_value": 0,
             "max_value": 255,
+            "step": 1,
             "unit_of_measurement": None,
             "icon": "mdi:brightness-5",
             "qos": 1,
@@ -78,10 +80,9 @@ class MQTTNumber(NumberEntity):
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": self._device,
             "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT",
+            "model": "VBot Assistant MQTT"
         }
 
     async def async_set_native_value(self, value):
