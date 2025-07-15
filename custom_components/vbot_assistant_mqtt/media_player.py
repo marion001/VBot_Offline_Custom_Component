@@ -54,10 +54,10 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._media_title = media_id.split("/")[-1]
         self._attr_state = MediaPlayerState.PLAYING
 
-        _LOGGER.info("Yêu cầu phát media:")
-        _LOGGER.info("  - Loại: %s", media_type)
-        _LOGGER.info("  - URL: %s", self._media_url)
-        _LOGGER.info("  - Tên file: %s", self._media_title)
+        #_LOGGER.info("Yêu cầu phát media:")
+        #_LOGGER.info("  - Loại: %s", media_type)
+        #_LOGGER.info("  - URL: %s", self._media_url)
+        #_LOGGER.info("  - Tên file: %s", self._media_title)
 
         payload = {
             "action": "play",
@@ -76,7 +76,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_media_stop(self):
-        _LOGGER.info("Dừng phát media")
+        #_LOGGER.info("Dừng phát media")
         self._attr_state = MediaPlayerState.IDLE
         await mqtt.async_publish(
             self._hass,
@@ -88,7 +88,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_media_pause(self):
-        _LOGGER.info("Tạm dừng media")
+        #_LOGGER.info("Tạm dừng media")
         self._attr_state = MediaPlayerState.PAUSED
         await mqtt.async_publish(
             self._hass,
@@ -100,7 +100,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_media_play(self):
-        _LOGGER.info("Tiếp tục phát media")
+        #_LOGGER.info("Tiếp tục phát media")
         self._attr_state = MediaPlayerState.PLAYING
         await mqtt.async_publish(
             self._hass,
