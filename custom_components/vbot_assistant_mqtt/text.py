@@ -23,15 +23,15 @@ async def async_setup_entry(
     inputs_config = [
         {
             "id": f"{device.lower()}_news_paper_name",
-            "name": "Nhập Tên Báo, Tin Tức",
+            "name": f"{device} News Paper Name",
         },
         {
             "id": f"{device.lower()}_main_processing",
-            "name": "Nội Dung Cần Xử Lý",
+            "name": f"{device} Main Processing",
         },
         {
             "id": f"{device.lower()}_vbot_tts",
-            "name": "Nội Dung Thông Báo TTS",
+            "name": f"{device} VBot TTS",
         }
     ]
 
@@ -51,12 +51,11 @@ async def async_setup_entry(
 class VBotTextEntity(TextEntity):  # ✅ Kế thừa TextEntity thay vì InputTextEntity
     def __init__(self, unique_id: str, name: str, device: str):
         self._attr_unique_id = unique_id
-        self._attr_entity_id = f"text.{unique_id}"
-        self._attr_name = name
+        self._attr_name = name  # tên thân thiện
         self._device = device
         self._attr_native_value = ""
         self._attr_min = 0
-        self._attr_max = 255  # hoặc giới hạn tùy ý
+        self._attr_max = 255
 
     @property
     def device_info(self):
