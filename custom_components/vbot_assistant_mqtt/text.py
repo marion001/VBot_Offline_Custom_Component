@@ -61,7 +61,7 @@ class VBotTextEntity(TextEntity):  # ✅ Kế thừa TextEntity thay vì InputTe
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assistant",
+            "name": f"{self._device} VBot Assistant Text",
             "manufacturer": "Vũ Tuyển",
             "model": "VBot Assistant MQTT",
         }
