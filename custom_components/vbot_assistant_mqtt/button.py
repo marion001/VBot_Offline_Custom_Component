@@ -165,8 +165,8 @@ class VBotMQTTButton(ButtonEntity):
         device: str | None = None
     ):
         self._hass = hass
-        #self._attr_unique_id = unique_id
-        self._attr_unique_id = f"{device.lower()}_{topic.replace('/', '_')}_button"
+        self._attr_unique_id = unique_id
+        #self._attr_unique_id = f"{device.lower()}_{topic.replace('/', '_')}_button"
         self._attr_name = name
         self._topic = topic
         self._payload = payload
