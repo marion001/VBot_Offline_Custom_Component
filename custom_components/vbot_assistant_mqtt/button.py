@@ -116,21 +116,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "name": f"{device} News Paper Player",
             "icon": "mdi:podcast",
             "topic": f"{device}/script/news_paper/set",
-            "template_input": f"input_text.{device.lower()}_news_paper_name"
+            "template_input": f"text.{device.lower()}_news_paper_name"
         },
         {
             "id": f"{device}_main_processing",
             "name": f"{device} Main Processing",
             "icon": "mdi:robot-confused-outline",
             "topic": f"{device}/script/main_processing/set",
-            "template_input": f"input_text.{device.lower()}_main_processing"
+            "template_input": f"text.{device.lower()}_main_processing"
         },
         {
             "id": f"{device}_vbot_tts",
             "name": f"{device} VBot TTS",
             "icon": "mdi:robot-confused-outline",
             "topic": f"{device}/script/vbot_tts/set",
-            "template_input": f"input_text.{device.lower()}_vbot_tts"
+            "template_input": f"text.{device.lower()}_vbot_tts"
         }
     ]
 
