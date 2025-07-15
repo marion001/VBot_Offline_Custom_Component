@@ -1,5 +1,5 @@
 import logging
-from homeassistant.components.text import TextEntity  # ✅ Sửa ở đây
+from homeassistant.components.text import TextEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -7,6 +7,9 @@ from .const import DOMAIN, CONF_DEVICE_ID
 
 _LOGGER = logging.getLogger(__name__)
 
+async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, discovery_info=None):
+    _LOGGER.warning("VBot Assistant MQTT không hỗ trợ cấu hình YAML. Vui lòng dùng UI (config_entry).")
+    pass
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -19,7 +22,6 @@ async def async_setup_entry(
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
 
-    # Danh sách text field cấu hình động
     inputs_config = [
         {
             "id": f"{device.lower()}_news_paper_name",
@@ -45,7 +47,7 @@ async def async_setup_entry(
                 unique_id=inp["id"],
                 name=inp["name"],
                 device=device,
-                initial_value=inp.get("value", "")  # ✅ dùng "value"
+                initial_value=inp.get("value", "")
             )
         )
 
@@ -56,7 +58,7 @@ class VBotTextEntity(TextEntity):
         self._attr_unique_id = unique_id
         self._attr_name = name
         self._device = device
-        self._attr_native_value = initial_value  # ✅ gán giá trị ban đầu
+        self._attr_native_value = initial_value
         self._attr_min = 0
         self._attr_max = 255
 
@@ -77,4 +79,4 @@ class VBotTextEntity(TextEntity):
         _LOGGER.debug("Thiết lập giá trị của %s thành %s", self._attr_unique_id, value)
         self._attr_native_value = value
         self.async_write_ha_state()
-        # Optional: publish MQTT ở đây nếu cần
+        #thực hiện hành động khác ở đây nếu có

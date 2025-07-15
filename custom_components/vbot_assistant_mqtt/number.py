@@ -9,6 +9,7 @@ from .const import DOMAIN, CONF_DEVICE_ID
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+    _LOGGER.warning("VBot Assistant MQTT không hỗ trợ cấu hình YAML. Vui lòng dùng UI (config_entry).")
     pass
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
