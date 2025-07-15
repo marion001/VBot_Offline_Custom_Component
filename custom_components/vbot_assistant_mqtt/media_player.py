@@ -49,16 +49,16 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._media_title = media_id.split("/")[-1]
         self._media_url = media_id
         self._attr_state = MediaPlayerState.PLAYING
-
+        _LOGGER.error(f"media_id: {media_id}")
         # Gửi lệnh qua MQTT đến VBot
         await mqtt.async_publish(
             self._hass,
             f"{self._device}/script/media_control/set",
             f'''{{
                 "action": "play",
-                "media_link": "{media_id}",
+                "media_link": "{self._media_url}",
                 "media_name": "{self._media_title}",
-                "media_player_source": "MediaPlayerEntity"
+                "media_player_source": "MQTT"
             }}''',
             qos=1,
             retain=False
