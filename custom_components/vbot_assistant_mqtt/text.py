@@ -24,7 +24,7 @@ async def async_setup_entry(
         {
             "id": f"{device.lower()}_news_paper_name",
             "name": f"{device} News Paper Name",
-            "value": "Đọc báo tuổi trẻ",
+            "value": "Báo tuổi trẻ",
         },
         {
             "id": f"{device.lower()}_main_processing",
