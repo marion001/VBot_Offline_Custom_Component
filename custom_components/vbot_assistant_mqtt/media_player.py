@@ -1,4 +1,5 @@
 import logging
+import json
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -49,17 +50,20 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._media_title = media_id.split("/")[-1]
         self._media_url = media_id
         self._attr_state = MediaPlayerState.PLAYING
-        _LOGGER.error(f"media_id: {media_id}")
-        # Gửi lệnh qua MQTT đến VBot
+        _LOGGER.debug(f"media_id: {media_id}")
+
+        # Sử dụng json.dumps để giữ nguyên HOA/thường
+        payload = {
+            "action": "play",
+            "media_link": self._media_url,
+            "media_name": self._media_title,
+            "media_player_source": "MQTT"
+        }
+
         await mqtt.async_publish(
             self._hass,
             f"{self._device}/script/media_control/set",
-            f'''{{
-                "action": "play",
-                "media_link": "{self._media_url}",
-                "media_name": "{self._media_title}",
-                "media_player_source": "MQTT"
-            }}''',
+            json.dumps(payload),  # ⬅️ Không còn lỗi chữ in hoa
             qos=1,
             retain=False
         )
