@@ -6,5 +6,6 @@
   "requirements": [],
   "dependencies": ["mqtt"],
   "codeowners": ["@marion001"],
-  "config_flow": true
+  "config_flow": true,
+  "platforms": ["button", "sensor", "text", "number", "select", "media_player"]
 }

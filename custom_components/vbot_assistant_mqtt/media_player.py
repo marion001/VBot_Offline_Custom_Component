@@ -1,0 +1,99 @@
+import logging
+from homeassistant.components.media_player import (
+    MediaPlayerEntity,
+    MediaPlayerEntityFeature,
+    MediaPlayerState
+)
+from homeassistant.components import mqtt
+from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from .const import DOMAIN, CONF_DEVICE_ID
+
+_LOGGER = logging.getLogger(__name__)
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+    device = entry.data.get(CONF_DEVICE_ID)
+    if not device:
+        _LOGGER.error("Không tìm thấy device_id trong cấu hình")
+        return
+
+    async_add_entities([VBotMediaPlayer(hass, device)])
+
+class VBotMediaPlayer(MediaPlayerEntity):
+    def __init__(self, hass: HomeAssistant, device: str):
+        self._hass = hass
+        self._device = device
+        self._attr_name = f"{device} Media Player"
+        self._attr_unique_id = f"{device.lower()}_media_player"
+        self._attr_state = MediaPlayerState.IDLE
+        self._attr_supported_features = (
+            MediaPlayerEntityFeature.PLAY
+            | MediaPlayerEntityFeature.STOP
+            | MediaPlayerEntityFeature.PAUSE
+            | MediaPlayerEntityFeature.PLAY_MEDIA
+        )
+        self._media_title = None
+        self._media_url = None
+
+    @property
+    def state(self):
+        return self._attr_state
+
+    @property
+    def media_title(self):
+        return self._media_title
+
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+        _LOGGER.info("Phát media: %s (%s)", media_id, media_type)
+        self._media_title = media_id.split("/")[-1]
+        self._media_url = media_id
+        self._attr_state = MediaPlayerState.PLAYING
+
+        # Gửi lệnh qua MQTT đến VBot
+        await mqtt.async_publish(
+            self._hass,
+            f"{self._device}/script/media_control/set",
+            f'''{{
+                "action": "play",
+                "media_link": "{media_id}",
+                "media_name": "{self._media_title}",
+                "media_player_source": "MediaPlayerEntity"
+            }}''',
+            qos=1,
+            retain=False
+        )
+        self.async_write_ha_state()
+
+    async def async_media_stop(self):
+        self._attr_state = MediaPlayerState.IDLE
+        await mqtt.async_publish(
+            self._hass,
+            f"{self._device}/script/media_control/set",
+            "STOP",
+            qos=1,
+            retain=False
+        )
+        self.async_write_ha_state()
+
+    async def async_media_pause(self):
+        self._attr_state = MediaPlayerState.PAUSED
+        await mqtt.async_publish(
+            self._hass,
+            f"{self._device}/script/media_control/set",
+            "PAUSE",
+            qos=1,
+            retain=False
+        )
+        self.async_write_ha_state()
+
+    async def async_media_play(self):
+        self._attr_state = MediaPlayerState.PLAYING
+        await mqtt.async_publish(
+            self._hass,
+            f"{self._device}/script/media_control/set",
+            "RESUME",
+            qos=1,
+            retain=False
+        )
+        self.async_write_ha_state()

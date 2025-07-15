@@ -7,19 +7,13 @@ from .const import DOMAIN, CONF_DEVICE_ID
 
 _LOGGER = logging.getLogger(__name__)
 
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     cfg = entry.data
     device = cfg.get(CONF_DEVICE_ID)
     if not device:
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
 
-    # Danh sách input_text cấu hình động
     inputs_config = [
         {
             "id": f"{device}_news_paper_name",
@@ -46,7 +40,6 @@ async def async_setup_entry(
         )
 
     async_add_entities(entities)
-
 
 class VBotInputTextEntity(InputTextEntity):
     def __init__(self, unique_id: str, name: str, device: str):
