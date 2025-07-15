@@ -49,6 +49,7 @@ class MQTTSensor(SensorEntity):
         self._hass = hass
         self._name = name
         self._device = device
+        self._attr_unique_id = f"{device.lower()}_{state_topic.replace('/', '_')}_sensor"
         self._state_topic = state_topic
         self._attr_icon = icon or "mdi:tune"
         self._state = None

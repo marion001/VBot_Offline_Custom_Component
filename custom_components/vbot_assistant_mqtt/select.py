@@ -36,6 +36,7 @@ class MQTTSelect(SelectEntity):
         self._hass = hass
         self._name = name
         self._device = device
+        self._attr_unique_id = f"{device.lower()}_{state_topic.replace('/', '_')}_select"
         self._state_topic = state_topic
         self._command_topic = command_topic
         self._options = options

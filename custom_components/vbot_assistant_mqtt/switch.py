@@ -406,7 +406,8 @@ class MQTTSwitch(SwitchEntity):
         self._hass = hass
         self._name = name
         self._device = device
-        self._attr_unique_id = f"{state_topic}_switch"
+        #self._attr_unique_id = f"{state_topic}_switch"
+        self._attr_unique_id = f"{device.lower()}_{state_topic.replace('/', '_')}_switch"
         self._attr_device_class = "switch"
         self._attr_icon = icon or "mdi:dip-switch"
         self._state_topic = state_topic

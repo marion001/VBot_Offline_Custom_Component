@@ -55,7 +55,8 @@ async def async_setup_entry(
 
 class VBotTextEntity(TextEntity):
     def __init__(self, unique_id: str, name: str, device: str, initial_value: str = ""):
-        self._attr_unique_id = unique_id
+        #self._attr_unique_id = unique_id
+        self._attr_unique_id = f"{device.lower()}_{state_topic.replace('/', '_')}_text"
         self._attr_name = name
         self._device = device
         self._attr_native_value = initial_value
