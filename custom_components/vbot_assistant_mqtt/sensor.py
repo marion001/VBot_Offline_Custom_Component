@@ -19,22 +19,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return
     sensors = [
         {
-            "name": f"{device} Ngày Phát Hành Giao Diện Sensor",
+            "name": f"Ngày Phát Hành Giao Diện Sensor {device}",
             "state_topic": f"{device}/sensor/vbot_interface_releaseDate/state",
             "icon": "mdi:calendar"
         },
         {
-            "name": f"{device} Phiên Bản Giao Diện Sensor",
+            "name": f"Phiên Bản Giao Diện Sensor {device}",
             "state_topic": f"{device}/sensor/vbot_interface_version/state",
             "icon": "mdi:calendar"
         },
         {
-            "name": f"{device} Phiên Bản Chương Trình Sensor",
+            "name": f"Phiên Bản Chương Trình Sensor {device}",
             "state_topic": f"{device}/sensor/vbot_program_version/state",
             "icon": "mdi:calendar"
         },
         {
-            "name": f"{device} Ngày Phát Hành Chương Trình Sensor",
+            "name": f"Ngày Phát Hành Chương Trình Sensor {device}",
             "state_topic": f"{device}/sensor/vbot_program_releaseDate/state",
             "icon": "mdi:calendar"
         },

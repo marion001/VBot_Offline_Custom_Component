@@ -19,7 +19,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return
     selects = [
         {
-            "name": f"{device} Kiểu Hiển Thị Logs Select",
+            "name": f"Kiểu Hiển Thị Logs Select {device}",
             "state_topic": f"{device}/select/log_display_style/state",
             "command_topic": f"{device}/select/log_display_style/set",
             "options": ["console", "display_screen", "api", "all"],

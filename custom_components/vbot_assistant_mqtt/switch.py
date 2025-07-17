@@ -20,7 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return
     switches = [
           {
-            "name": f"{device} Logs Hệ Thống Active",
+            "name": f"Logs Hệ Thống Active {device}",
             "state_topic": f"{device}/switch/log_display_active/state",
             "command_topic": f"{device}/switch/log_display_active/set",
             "payload_on": "ON",
@@ -33,7 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:math-log"
           },
           {
-            "name": f"{device} Chế Độ Hội Thoại Active",
+            "name": f"Chế Độ Hội Thoại Active {device}",
             "state_topic": f"{device}/switch/conversation_mode/state",
             "command_topic": f"{device}/switch/conversation_mode/set",
             "payload_on": "ON",
@@ -46,7 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:repeat-once"
           },
           {
-            "name": f"{device} Chế Độ Câu Phản Hồi Active",
+            "name": f"Chế Độ Câu Phản Hồi Active {device}",
             "state_topic": f"{device}/switch/wakeup_reply/state",
             "command_topic": f"{device}/switch/wakeup_reply/set",
             "payload_on": "ON",
@@ -59,7 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:reply-all"
           },
           {
-            "name": f"{device} Mic, Microphone Active",
+            "name": f"Mic, Microphone Active {device}",
             "state_topic": f"{device}/switch/mic_on_off/state",
             "command_topic": f"{device}/switch/mic_on_off/set",
             "payload_on": "ON",
@@ -72,7 +72,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:microphone-settings"
           },
           {
-            "name": f"{device} Media Player Active",
+            "name": f"Media Player Active {device}",
             "state_topic": f"{device}/switch/media_player_active/state",
             "command_topic": f"{device}/switch/media_player_active/set",
             "payload_on": "ON",
@@ -85,7 +85,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:multimedia"
           },
           {
-            "name": f"{device} Wakeup Hotword in Media Player Active",
+            "name": f"Wakeup Hotword in Media Player Active {device}",
             "state_topic": f"{device}/switch/wake_up_in_media_player/state",
             "command_topic": f"{device}/switch/wake_up_in_media_player/set",
             "payload_on": "ON",
@@ -98,7 +98,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:speaker-play"
           },
           {
-            "name": f"{device} Cache TTS Active",
+            "name": f"Cache TTS Active {device}",
             "state_topic": f"{device}/switch/cache_tts_active/state",
             "command_topic": f"{device}/switch/cache_tts_active/set",
             "payload_on": "ON",
@@ -111,7 +111,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:cached"
           },
           {
-            "name": f"{device} Wake UP",
+            "name": f"Wake UP {device}",
             "state_topic": f"{device}/switch/conversation_mode_flag/state",
             "command_topic": f"{device}/switch/conversation_mode_flag/set",
             "payload_on": "ON",
@@ -124,7 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:play-circle-outline"
           },
           {
-            "name": f"{device} Home Asistant Active",
+            "name": f"Home Asistant Active {device}",
             "state_topic": f"{device}/switch/home_assistant_active/state",
             "command_topic": f"{device}/switch/home_assistant_active/set",
             "payload_on": "ON",
@@ -137,7 +137,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:home-assistant"
           },
           {
-            "name": f"{device} Home Asistant Custom Command Active",
+            "name": f"Home Asistant Custom Command Active {device}",
             "state_topic": f"{device}/switch/hass_custom_commands_active/state",
             "command_topic": f"{device}/switch/hass_custom_commands_active/set",
             "payload_on": "ON",
@@ -150,7 +150,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:home-plus"
           },
           {
-            "name": f"{device} DEV Custom Active",
+            "name": f"DEV Custom Active {device}",
             "state_topic": f"{device}/switch/developer_customization/state",
             "command_topic": f"{device}/switch/developer_customization/set",
             "payload_on": "ON",
@@ -163,7 +163,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:dev-to"
           },
           {
-            "name": f"{device} Xử Lý Tiếp Cho DEV Skill Active",
+            "name": f"Xử Lý Tiếp Cho DEV Skill Active {device}",
             "state_topic": f"{device}/switch/dev_vbot_processing_active/state",
             "command_topic": f"{device}/switch/dev_vbot_processing_active/set",
             "payload_on": "ON",
@@ -176,7 +176,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:developer-board"
           },
           {
-            "name": f"{device} Default Assistant Active",
+            "name": f"Default Assistant Active {device}",
             "state_topic": f"{device}/switch/default_assistant_active/state",
             "command_topic": f"{device}/switch/default_assistant_active/set",
             "payload_on": "ON",
@@ -189,7 +189,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:assistant"
           },
           {
-            "name": f"{device} Dify AI Active",
+            "name": f"Dify AI Active {device}",
             "state_topic": f"{device}/switch/dify_ai_active/state",
             "command_topic": f"{device}/switch/dify_ai_active/set",
             "payload_on": "ON",
@@ -202,7 +202,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:assistant"
           },
           {
-            "name": f"{device} Google Gemini Active",
+            "name": f"Google Gemini Active {device}",
             "state_topic": f"{device}/switch/google_gemini_active/state",
             "command_topic": f"{device}/switch/google_gemini_active/set",
             "payload_on": "ON",
@@ -215,7 +215,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:google-assistant"
           },
           {
-            "name": f"{device} Chat GPT Active",
+            "name": f"Chat GPT Active {device}",
             "state_topic": f"{device}/switch/chat_gpt_active/state",
             "command_topic": f"{device}/switch/chat_gpt_active/set",
             "payload_on": "ON",
@@ -228,7 +228,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:assistant"
           },
           {
-            "name": f"{device} Music Local Active",
+            "name": f"Music Local Active {device}",
             "state_topic": f"{device}/switch/music_local_active/state",
             "command_topic": f"{device}/switch/music_local_active/set",
             "payload_on": "ON",
@@ -241,7 +241,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:music-circle-outline"
           },
           {
-            "name": f"{device} ZingMp3 Active",
+            "name": f"ZingMp3 Active {device}",
             "state_topic": f"{device}/switch/zing_mp3_active/state",
             "command_topic": f"{device}/switch/zing_mp3_active/set",
             "payload_on": "ON",
@@ -254,7 +254,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:music-circle"
           },
           {
-            "name": f"{device} Youtube Active",
+            "name": f"Youtube Active {device}",
             "state_topic": f"{device}/switch/youtube_active/state",
             "command_topic": f"{device}/switch/youtube_active/set",
             "payload_on": "ON",
@@ -267,7 +267,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:youtube"
           },
           {
-            "name": f"{device} Logs MQTT Broker Active",
+            "name": f"Logs MQTT Broker Active {device}",
             "state_topic": f"{device}/switch/mqtt_show_logs_reconnect/state",
             "command_topic": f"{device}/switch/mqtt_show_logs_reconnect/set",
             "payload_on": "ON",
@@ -280,7 +280,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:math-log"
           },
           {
-            "name": f"{device} News Paper Active",
+            "name": f"News Paper Active {device}",
             "state_topic": f"{device}/switch/news_paper_active/state",
             "command_topic": f"{device}/switch/news_paper_active/set",
             "payload_on": "ON",
@@ -293,7 +293,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:podcast"
           },
           {
-            "name": f"{device} Radio Active",
+            "name": f"Radio Active {device}",
             "state_topic": f"{device}/switch/radio_active/state",
             "command_topic": f"{device}/switch/radio_active/set",
             "payload_on": "ON",
@@ -306,7 +306,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:radio"
           },
           {
-            "name": f"{device} PodCast Active",
+            "name": f"PodCast Active {device}",
             "state_topic": f"{device}/switch/podcast_active/state",
             "command_topic": f"{device}/switch/podcast_active/set",
             "payload_on": "ON",
@@ -319,7 +319,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:radio-tower"
           },
           {
-            "name": f"{device} Zalo AI Assistant Active",
+            "name": f"Zalo AI Assistant Active {device}",
             "state_topic": f"{device}/switch/zalo_assistant_active/state",
             "command_topic": f"{device}/switch/zalo_assistant_active/set",
             "payload_on": "ON",
@@ -332,7 +332,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:assistant"
           },
           {
-            "name": f"{device} Display Screen Active",
+            "name": f"Display Screen Active {device}",
             "state_topic": f"{device}/switch/display_screen_active/state",
             "command_topic": f"{device}/switch/display_screen_active/set",
             "payload_on": "ON",
@@ -345,7 +345,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:monitor-shimmer"
           },
           {
-            "name": f"{device} Multiple Command Active",
+            "name": f"Multiple Command Active {device}",
             "state_topic": f"{device}/switch/multiple_command_active/state",
             "command_topic": f"{device}/switch/multiple_command_active/set",
             "payload_on": "ON",
@@ -358,7 +358,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:apple-keyboard-command"
           },
           {
-            "name": f"{device} Continue Listening After Commands Active",
+            "name": f"Continue Listening After Commands Active {device}",
             "state_topic": f"{device}/switch/continue_listening_after_commands/state",
             "command_topic": f"{device}/switch/continue_listening_after_commands/set",
             "payload_on": "ON",
@@ -371,7 +371,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:chevron-double-up"
           },
           {
-            "name": f"{device} Olli AI Assistant Active",
+            "name": f"Olli AI Assistant Active {device}",
             "state_topic": f"{device}/switch/olli_assistant_active/state",
             "command_topic": f"{device}/switch/olli_assistant_active/set",
             "payload_on": "ON",
@@ -384,7 +384,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:assistant"
           },
           {
-            "name": f"{device} DEV Custom Assistant Active",
+            "name": f"DEV Custom Assistant Active {device}",
             "state_topic": f"{device}/switch/dev_custom_assistant_active/state",
             "command_topic": f"{device}/switch/dev_custom_assistant_active/set",
             "payload_on": "ON",

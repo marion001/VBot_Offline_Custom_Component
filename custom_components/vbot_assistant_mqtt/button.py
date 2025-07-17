@@ -24,28 +24,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     buttons_config = [
         {
             "id": f"{device}_media_control_pause",
-            "name": f"{device} Media Pause Button",
+            "name": f"Media Pause Button {device}",
             "icon": "mdi:pause-circle-outline",
             "topic": f"{device}/script/media_control/set",
             "payload": "PAUSE"
         },
         {
             "id": f"{device}_media_control_stop",
-            "name": f"{device} Media Stop Button",
+            "name": f"Media Stop Button {device}",
             "icon": "mdi:stop-circle-outline",
             "topic": f"{device}/script/media_control/set",
             "payload": "STOP"
         },
         {
             "id": f"{device}_media_control_resume",
-            "name": f"{device} Media Resume Button",
+            "name": f"Media Resume Button {device}",
             "icon": "mdi:motion-play-outline",
             "topic": f"{device}/script/media_control/set",
             "payload": "RESUME"
         },
         {
             "id": f"{device}_volume_control_up",
-            "name": f"{device} Volume UP Button",
+            "name": f"Volume UP Button {device}",
             "icon": "mdi:volume-plus",
             "topic": f"{device}/script/volume_control/set",
             "payload": "UP"
@@ -59,63 +59,63 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         },
         {
             "id": f"{device}_volume_control_min",
-            "name": f"{device} Volume MIN Button",
+            "name": f"Volume MIN Button {device}",
             "icon": "mdi:volume-low",
             "topic": f"{device}/script/volume_control/set",
             "payload": "MIN"
         },
         {
             "id": f"{device}_volume_control_max",
-            "name": f"{device} Volume MAX Button",
+            "name": f"Volume MAX Button {device}",
             "icon": "mdi:volume-high",
             "topic": f"{device}/script/volume_control/set",
             "payload": "MAX"
         },
         {
             "id": f"{device}_playlist_local_player",
-            "name": f"{device} PlayList Local Player Button",
+            "name": f"PlayList Local Player Button {device}",
             "icon": "mdi:play",
             "topic": f"{device}/script/playlist_control/set",
             "payload": "LOCAL"
         },
         {
             "id": f"{device}_playlist_control_player",
-            "name": f"{device} PlayList Player Button",
+            "name": f"PlayList Player Button {device}",
             "icon": "mdi:play",
             "topic": f"{device}/script/playlist_control/set",
             "payload": "PLAY"
         },
         {
             "id": f"{device}_playlist_control_next",
-            "name": f"{device} PlayList Next Button",
+            "name": f"PlayList Next Button {device}",
             "icon": "mdi:skip-forward",
             "topic": f"{device}/script/playlist_control/set",
             "payload": "NEXT"
         },
         {
             "id": f"{device}_playlist_control_prev",
-            "name": f"{device} PlayList Prev Button",
+            "name": f"PlayList Prev Button {device}",
             "icon": "mdi:skip-backward",
             "topic": f"{device}/script/playlist_control/set",
             "payload": "PREV"
         },
         {
             "id": f"{device}_news_paper_player",
-            "name": f"{device} News Paper Player Button",
+            "name": f"News Paper Player Button {device}",
             "icon": "mdi:podcast",
             "topic": f"{device}/script/news_paper/set",
             "template_input": f"text.{device.lower()}_news_paper_name"
         },
         {
             "id": f"{device}_main_processing",
-            "name": f"{device} Main Processing Button",
+            "name": f"Main Processing Button {device}",
             "icon": "mdi:robot-confused-outline",
             "topic": f"{device}/script/main_processing/set",
             "template_input": f"text.{device.lower()}_main_processing"
         },
         {
             "id": f"{device}_vbot_tts",
-            "name": f"{device} VBot TTS Button",
+            "name": f"VBot TTS Button {device}",
             "icon": "mdi:robot-confused-outline",
             "topic": f"{device}/script/vbot_tts/set",
             "template_input": f"text.{device.lower()}_vbot_tts"

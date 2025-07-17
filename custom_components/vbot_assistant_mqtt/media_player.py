@@ -29,7 +29,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
     def __init__(self, hass: HomeAssistant, device: str):
         self._hass = hass
         self._device = device
-        self._attr_name = f"{device} Media Player"
+        self._attr_name = f"Media Player {device}"
         self._attr_unique_id = f"{device.lower()}_media_player"
         self._attr_state = MediaPlayerState.IDLE
         self._attr_supported_features = (
@@ -110,7 +110,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
             retain=False
         )
         self.async_write_ha_state()
-        
+
     @property
     def device_info(self):
         if not self._device:
