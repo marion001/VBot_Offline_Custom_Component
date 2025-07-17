@@ -25,17 +25,17 @@ async def async_setup_entry(
     inputs_config = [
         {
             "id": f"{device.lower()}_news_paper_name",
-            "name": f"News Paper Name Text {device}",
+            "name": f"News Paper Name Text ({device})",
             "value": "Báo tuổi trẻ",
         },
         {
             "id": f"{device.lower()}_main_processing",
-            "name": f"Main Processing Text {device}",
+            "name": f"Main Processing Text ({device})",
             "value": "Mấy giờ rồi",
         },
         {
             "id": f"{device.lower()}_vbot_tts",
-            "name": f"VBot TTS Text {device}",
+            "name": f"VBot TTS Text ({device})",
             "value": "Chào bạn, đây là nội dung để phát thông báo",
         }
     ]

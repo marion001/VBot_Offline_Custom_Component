@@ -19,7 +19,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return
     selects = [
         {
-            "name": f"Kiểu Hiển Thị Logs Select {device}",
+            "name": f"Kiểu Hiển Thị Logs Select ({device})",
             "state_topic": f"{device}/select/log_display_style/state",
             "command_topic": f"{device}/select/log_display_style/set",
             "options": ["console", "display_screen", "api", "all"],
@@ -29,7 +29,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     entities = [MQTTSelect(hass, device=device, **s) for s in selects]
     async_add_entities(entities, update_before_add=True)
-
 
 class MQTTSelect(SelectEntity):
     def __init__(self, hass, name, state_topic, command_topic, options, icon=None, device=None):
