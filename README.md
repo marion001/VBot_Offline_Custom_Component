@@ -12,6 +12,7 @@ Trang Chính VBot Assistant: https://github.com/marion001/VBot_Offline
 2. Sau khi thêm URL xong bạn hãy tìm kiếm từ khóa: "VBot Assistant MQTT" trong HACS hãy tải xuống cài đặt nó
 3. Khởi động lại Home Assistant khi đã cài đặt xong "VBot Assistant MQTT"
 4. Đi tới: Cài đặt -> Thiết bị & Dịch vụ
+	- hoặc nhấn vào đây: [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=vbot_assistant_mqtt)
 5. Ở góc dưới cùng bên phải, chọn nút Thêm tích hợp -> tìm kiếm với tên: "VBot Assistant MQTT" và chọn
 6. Điền tên Client từ Cấu Hình Kết Nối MQTT của UI VBot vào ô: "Nhập Tên Client tương ứng trong (Cấu Hình Config -> Cấu Hình Kết Nối MQTT Broker) của loa VBot" -> Gửi đi
 7. Sau khi hoàn tất các bước sẽ tự động có các thực thể entity id xuất hiện
