@@ -11,9 +11,7 @@
             }
         },
         "error": {
-            "base": {
-                "device_exists": "Client ID Của thiết bị này đã tồn tại, Vui lòng thay đổi Client ID khác và nhập lại"
-            }
+            "device_exists": "Client ID Của thiết bị này đã tồn tại, Vui lòng thay đổi Client ID khác và nhập lại"
         }
     }
 }
