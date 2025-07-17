@@ -23,7 +23,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # ✅ Nếu không trùng, tạo entry mới
             if not errors:
                 return self.async_create_entry(
-                    title=f"VBot Assistant MQTT Client ID: {self.device_id}",
+                    title=f"Tên Client VBot Assistant MQTT: {self.device_id}",
                     data={CONF_DEVICE_ID: self.device_id}
                 )
 
