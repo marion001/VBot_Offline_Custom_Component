@@ -33,7 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "state_topic": f"{device}/number/led_brightness/state",
             "command_topic": f"{device}/number/led_brightness/set",
             "min_value": 0,
-            "max_value": 255,
+            "max_value": 100,
             "unit_of_measurement": None,
             "icon": "mdi:brightness-5",
             "qos": 1,
