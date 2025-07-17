@@ -21,6 +21,5 @@ Trang Chính VBot Assistant: https://github.com/marion001/VBot_Offline
 
 <img width="1911" height="915" alt="Image" src="https://github.com/user-attachments/assets/5ed4cfb8-6b05-428d-959c-328149373f60" />
 <img width="1901" height="909" alt="Image" src="https://github.com/user-attachments/assets/b2437e4c-d41c-46b2-a094-a3d136001448" />
-<img width="1917" height="915" alt="Image" src="https://github.com/user-attachments/assets/57196a4f-7c0f-4dad-8b18-4449075914f2" />
 <img width="1887" height="901" alt="Image" src="https://github.com/user-attachments/assets/74429691-9bb3-49b1-b72d-ea136776c33d" />
 <img width="1913" height="919" alt="Image" src="https://github.com/user-attachments/assets/3189100c-afe1-4fe7-81dd-d17a4a0df770" />
