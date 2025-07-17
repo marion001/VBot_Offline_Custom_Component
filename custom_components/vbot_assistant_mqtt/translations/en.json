@@ -9,6 +9,9 @@
           "device_id": "Tên Client MQTT Của Loa VBot"
         }
       }
+    },
+    "error": {
+      "device_exists": "Client ID Của thiết bị này đã tồn tại, Vui lòng thay đổi Client ID khác và nhập lại"
     }
   }
 }
