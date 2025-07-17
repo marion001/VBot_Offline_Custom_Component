@@ -1,17 +1,19 @@
 {
-  "title": "VBot Assistant MQTT",
-  "config": {
-    "step": {
-      "user": {
-        "title": "Liên Kết VBot Assistant MQTT",
-        "description": "Nhập Tên Client tương ứng trong (Cấu Hình Config MQTT) của loa VBot",
-        "data": {
-          "device_id": "Tên Client MQTT Của Loa VBot"
+    "title": "VBot Assistant MQTT",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Liên Kết VBot Assistant MQTT",
+                "description": "Nhập Tên Client tương ứng trong (Cấu Hình Config MQTT) của loa VBot",
+                "data": {
+                    "device_id": "Tên Client MQTT Của Loa VBot"
+                }
+            }
+        },
+        "error": {
+            "base": {
+                "device_exists": "Client ID Của thiết bị này đã tồn tại, Vui lòng thay đổi Client ID khác và nhập lại"
+            }
         }
-      }
-    },
-    "error": {
-      "device_exists": "Client ID Của thiết bị này đã tồn tại, Vui lòng thay đổi Client ID khác và nhập lại"
     }
-  }
 }
