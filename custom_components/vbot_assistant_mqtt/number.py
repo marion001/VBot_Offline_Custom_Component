@@ -19,7 +19,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return
     numbers = [
         {
-            "name": f"{device} Volume",
+            "name": f"{device} Volume Slide",
             "state_topic": f"{device}/number/volume/state",
             "command_topic": f"{device}/number/volume/set",
             "min_value": 0,
@@ -29,7 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "qos": 1,
         },
         {
-            "name": f"{device} Độ Sáng Đèn Led",
+            "name": f"{device} Độ Sáng Đèn Led Slide",
             "state_topic": f"{device}/number/led_brightness/state",
             "command_topic": f"{device}/number/led_brightness/set",
             "min_value": 0,
