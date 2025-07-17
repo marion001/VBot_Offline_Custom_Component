@@ -11,7 +11,7 @@
             }
         },
         "error": {
-            "device_exists": "Tên Client của thiết bị này đã tồn tại, Vui lòng thay đổi Tên Client khác và nhập lại"
+            "device_exists": "Tên Client của thiết bị này đã được liên kết và tồn tại trong Home Assistant, Vui lòng thay đổi Tên Client khác và nhập lại"
         }
     }
 }

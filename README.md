@@ -2,6 +2,8 @@
 Custom Component Tích Hợp VBot Assistant Tới Home Assistant (HASS) Thông Qua Giao Thức MQTT
 
 Trang Chính VBot Assistant: https://github.com/marion001/VBot_Offline
+- Group Hệ Hỗ Trợ: [Facebook - Group](https://www.facebook.com/groups/1148385343358824)
+- [Facebook - Vũ Tuyển](https://www.facebook.com/TWFyaW9uMDAx)
 
 ## Cài Đặt
 1. Cài đặt [bằng cách đăng ký làm kho lưu trữ tùy chỉnh của HACS thêm trực tiếp url]
