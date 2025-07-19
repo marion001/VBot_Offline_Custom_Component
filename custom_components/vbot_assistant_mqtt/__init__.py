@@ -53,7 +53,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEn
     hass.data[DOMAIN].pop(entry.entry_id, None)
     conversation.async_unset_agent(hass, entry)
     return True
-
-async def async_get_options_flow(config_entry):
-    from .config_flow import VBotOptionsFlowHandler
-    return VBotOptionsFlowHandler(config_entry)
