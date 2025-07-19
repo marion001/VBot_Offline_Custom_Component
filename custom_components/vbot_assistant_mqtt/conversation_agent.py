@@ -20,15 +20,15 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
 
         # 👉 Lấy trạng thái của entity select chọn luồng xử lý
         #select.che_do_xu_ly_tac_nhan_assist_vbot_dev_222
-        select_entity_id = f"select.{self.device_id.lower()}_assist_processing_mode_select"
+        select_entity_id = f"select.assist_tac_nhan_che_do_xu_ly_{self.device_id.lower()}"
         select_state = self.hass.states.get(select_entity_id)
         processing_mode = select_state.state if select_state else "chatbot"
 
         # 👉 Xác định topic theo chế độ xử lý
-        if processing_mode == "processing":
+        if processing_mode == "main_processing":
             topic = f"{self.device_id}/script/main_processing/set"
         else:
-            topic = f"{self.device_id}/script/chatbox_processing/set"
+            topic = f"{self.device_id}/script/chatbot_processing/set"
 
         try:
             await mqtt.async_publish(self.hass, topic, message, qos=1, retain=False)
