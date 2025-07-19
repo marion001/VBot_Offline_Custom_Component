@@ -53,7 +53,8 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     # ✅ Cho phép cấu hình lại
-    async def async_get_options_flow(self, config_entry):
+    @staticmethod
+    def async_get_options_flow(config_entry):
         return VBotOptionsFlowHandler(config_entry)
 
 
