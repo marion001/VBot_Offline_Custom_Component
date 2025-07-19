@@ -8,6 +8,6 @@
   "codeowners": ["@marion001"],
   "config_flow": true,
   "platforms": ["switch", "number", "sensor", "select", "button", "text", "media_player"],
-  "tts_platforms": ["vbot_assistant_mqtt"],
+  "tts_platforms": true,
   "domains": ["tts"]
 }
