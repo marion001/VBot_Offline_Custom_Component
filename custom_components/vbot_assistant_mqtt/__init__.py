@@ -2,18 +2,20 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.components import conversation
 
-from .const import DOMAIN, CONF_DEVICE_ID
-from .conversation_agent import VBotAssistantConversationAgent
+from .const import (
+    DOMAIN,
+    CONF_DEVICE_ID,
+    VBot_PROCESSING_MODE,
+)
+from .conversation_agent import (
+    VBotAssistantConversationAgent,
+    VBotChatboxConversationAgent,
+)
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
     """Hàm khởi tạo chung, không làm gì nếu không dùng YAML."""
     return True
-
-
-# Nếu vẫn giữ lại đoạn TTS engine cũ thì để nguyên, còn không thì xóa luôn cả hàm bên dưới:
-# async def async_get_tts_engine(hass, config, discovery_info=None):
-#     return await async_get_engine(hass, config, discovery_info)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
@@ -22,9 +24,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     hass.data[DOMAIN][entry.entry_id] = entry.data
 
     device_id = entry.data.get(CONF_DEVICE_ID)
+    processing_mode = entry.data.get(VBot_PROCESSING_MODE, "chatbot")  # Mặc định là 'chatbot'
+
     if device_id:
-        # Agent chính
-        agent = VBotAssistantConversationAgent(hass, entry, device_id)
+        # Khởi tạo agent theo chế độ được chọn
+        if processing_mode == "chatbot":
+            agent = VBotChatboxConversationAgent(hass, entry, device_id)
+        else:
+            agent = VBotAssistantConversationAgent(hass, entry, device_id)
+
         conversation.async_set_agent(hass, entry, agent)
 
     await hass.config_entries.async_forward_entry_setups(
