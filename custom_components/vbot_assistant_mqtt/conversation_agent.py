@@ -19,7 +19,8 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
         message = user_input.text or "Không có đầu vào"
 
         # 👉 Lấy trạng thái của entity select chọn luồng xử lý
-        select_entity_id = f"select.assist_processing_mode_select_{self.device_id.lower()}"
+        #select.che_do_xu_ly_tac_nhan_assist_vbot_dev_222
+        select_entity_id = f"select.{self.device_id.lower()}_assist_processing_mode_select"
         select_state = self.hass.states.get(select_entity_id)
         processing_mode = select_state.state if select_state else "chatbot"
 
