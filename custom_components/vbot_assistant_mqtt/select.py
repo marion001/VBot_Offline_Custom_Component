@@ -104,9 +104,9 @@ class ProcessingModeSelect(SelectEntity):
         self._device = device
         self._attr_name = f"Assist Tác Nhân Chế Độ Xử Lý ({device})"
         self._attr_unique_id = f"{device.lower()}_assist_processing_mode_select"
-        self._attr_options = ["chatbot_processing", "main_processing"]
+        self._attr_options = ["chatbot", "processing"]
         self._attr_icon = "mdi:robot"
-        self._attr_current_option = "chatbot_processing"
+        self._attr_current_option = "chatbot"
         self._attr_entity_id = f"select.assist_processing_mode_select_{device.lower()}"
     @property
     def current_option(self):

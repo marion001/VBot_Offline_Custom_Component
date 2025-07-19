@@ -20,19 +20,18 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
     async def async_process(self, user_input: conversation.ConversationInput) -> conversation.ConversationResult:
         message = user_input.text or "Không có đầu vào"
 
-        # 🧠 Lấy chế độ xử lý: chatbot_processing / main_processing
+        # 🧠 Lấy chế độ xử lý: chatbot / processing
         mode_entity_id = f"select.assist_tac_nhan_che_do_xu_ly_{self.device_id.lower()}"
         mode_state = self.hass.states.get(mode_entity_id)
-        processing_mode = mode_state.state if mode_state else "chatbot_processing"
+        processing_mode = mode_state.state if mode_state else "chatbot"
 
-        # 🧠 Lấy luồng xử lý: api / mqtt
+        # 🧠 Lấy luồng xử lý: api / mqtt select.assist_tac_nhan_luong_xu_ly_vbot_dev_222_2
         stream_entity_id = f"select.assist_tac_nhan_luong_xu_ly_{self.device_id.lower()}"
         stream_state = self.hass.states.get(stream_entity_id)
         processing_stream = stream_state.state if stream_state else "mqtt"
 
         # 🔍 Chuẩn hóa lại chế độ xử lý: "chatbot" / "processing"
         vbot_mode = "chatbot" if "chatbot" in processing_mode else "processing"
-        data_value = "main_processing" if "main" in processing_mode else "chatbot_processing"
 
         intent_response = intent.IntentResponse(language=user_input.language)
 
@@ -49,7 +48,7 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                 url = f"{self.base_url}/"
                 payload = {
                     "type": 3,
-                    "data": data_value,
+                    "data": "main_processing",
                     "action": vbot_mode,
                     "value": message
                 }
