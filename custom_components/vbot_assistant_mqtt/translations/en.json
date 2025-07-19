@@ -7,8 +7,16 @@
                 "description": "Nhập Tên Client tương ứng trong (Cấu Hình Config -> Cấu Hình Kết Nối MQTT Broker) của loa VBot",
                 "data": {
                     "device_id": "Tên Client MQTT Của Loa VBot",
-					"vbot_url_api": "Nhập IP:PORT Của API VBot",
-					"vbot_processing_mode": "Chọn Luồng Xử Lý Dữ Liệu Tác Nhân Assist"
+                    "vbot_url_api": "Nhập IP:PORT Của API VBot",
+                    "vbot_processing_mode": "Chọn Luồng Xử Lý Dữ Liệu Tác Nhân Assist"
+                }
+            },
+            "init": {
+                "title": "Cấu Hình Lại VBot Assistant",
+                "description": "Thay đổi thông số API hoặc chế độ xử lý cho tác nhân trợ lý VBot",
+                "data": {
+                    "vbot_url_api": "Nhập IP:PORT Của API VBot",
+                    "vbot_processing_mode": "Chọn Luồng Xử Lý Dữ Liệu Tác Nhân Assist"
                 }
             }
         },
