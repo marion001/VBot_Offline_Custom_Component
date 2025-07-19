@@ -30,8 +30,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
 
     mqtt_entities = [MQTTSelect(hass, device=device, **s) for s in selects]
-    internal_entities = [ProcessingModeSelect(device)]
-
+    internal_entities = [
+        ProcessingModeSelect(device),
+        ProcessingStreamSelect(device)
+    ]
     async_add_entities(mqtt_entities + internal_entities, update_before_add=True)
 
 # ✅ MQTT-based Select
@@ -101,13 +103,37 @@ class ProcessingModeSelect(SelectEntity):
     def __init__(self, device):
         self._device = device
         self._attr_name = f"Assist Tác Nhân Chế Độ Xử Lý ({device})"
-        self._attr_unique_id = f"{device.lower()}_assist_processing_mode_select"
+        #self._attr_unique_id = f"{device.lower()}_assist_processing_mode_select"
         self._attr_options = ["chatbot_processing", "main_processing"]
         self._attr_icon = "mdi:robot"
         self._attr_current_option = "chatbot_processing"
         self._attr_entity_id = f"select.assist_processing_mode_select_{device.lower()}"
+    @property
+    def current_option(self):
+        return self._attr_current_option
 
+    async def async_select_option(self, option: str):
+        self._attr_current_option = option
+        self.async_write_ha_state()
 
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._device)},
+            "name": f"{self._device} VBot Assistant",
+            "manufacturer": "Vũ Tuyển",
+            "model": "VBot Assistant MQTT"
+        }
+
+# ✅ Internal Select: luồng xử lý API hoặc MQTT
+class ProcessingStreamSelect(SelectEntity):
+    def __init__(self, device):
+        self._device = device
+        self._attr_name = f"Assist Tác Nhân Luồng Xử Lý ({device})"
+        self._attr_unique_id = f"assist_stream_select_{device.lower()}"
+        self._attr_options = ["api", "mqtt"]
+        self._attr_icon = "mdi:transfer-right"
+        self._attr_current_option = "api"  # hoặc bạn chọn mặc định là "api"
 
     @property
     def current_option(self):
