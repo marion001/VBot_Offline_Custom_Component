@@ -82,10 +82,11 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
 
         # 🔁 Trả lại kết quả cho Assist
         intent_response.async_set_speech(response_text)
-        intent_response.async_set_card({
-            "title": "VBot Assistant",
-            "content": response_text
-        })
+        intent_response.async_set_card(
+            title="VBot Assistant",
+            content=response_text
+        )
+
 
         return conversation.ConversationResult(
             response=intent_response,
