@@ -1,6 +1,7 @@
 from .const import DOMAIN
 from .tts import async_get_engine
 
+
 async def async_setup(hass, config):
     return True
 
