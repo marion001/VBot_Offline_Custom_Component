@@ -3,7 +3,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components import conversation
 
 from .const import DOMAIN, CONF_DEVICE_ID
-from .conversation_agent import VBotAssistantConversationAgent, VBotChatboxConversationAgent
+from .conversation_agent import VBotAssistantConversationAgent
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
@@ -23,12 +23,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
 
     device_id = entry.data.get(CONF_DEVICE_ID)
     if device_id:
+        # Agent chính
         agent = VBotAssistantConversationAgent(hass, entry, device_id)
         conversation.async_set_agent(hass, entry, agent)
-
-        # Agent 2: Chatbox (dùng ID riêng)
-        chatbox_agent = VBotChatboxConversationAgent(hass, entry, device_id)
-        conversation.async_set_agent(hass, entry, chatbox_agent, agent_id=f"{device_id}_chatbox")
 
     await hass.config_entries.async_forward_entry_setups(
         entry,

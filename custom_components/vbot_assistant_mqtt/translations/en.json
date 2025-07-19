@@ -6,7 +6,9 @@
                 "title": "Liên Kết VBot Assistant MQTT",
                 "description": "Nhập Tên Client tương ứng trong (Cấu Hình Config -> Cấu Hình Kết Nối MQTT Broker) của loa VBot",
                 "data": {
-                    "device_id": "Tên Client MQTT Của Loa VBot"
+                    "device_id": "Tên Client MQTT Của Loa VBot",
+					"vbot_url_api": "Nhập URL API VBot",
+					"vbot_processing_mode": "Chọn luồng xử lý"
                 }
             }
         },
