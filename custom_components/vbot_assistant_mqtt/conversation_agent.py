@@ -15,6 +15,11 @@ class VBotAssistantConversationAgent(conversation.AbstractConversationAgent):
     def supported_languages(self) -> list[str]:
         return ["vi"]
 
+    @property
+    def name(self) -> str:
+        # 👇 Tên hiển thị trong giao diện Assist
+        return f"VBot Assist MQTT ({self.device_id})"
+
     async def async_process(self, user_input: conversation.ConversationInput) -> conversation.ConversationResult:
         message = user_input.text or "Không có đầu vào"
         topic = f"{self.device_id}/script/main_processing/set"
