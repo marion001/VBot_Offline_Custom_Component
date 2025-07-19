@@ -60,11 +60,18 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                     async with session.post(url, json=payload, headers=headers) as resp:
                         if resp.status == 200:
                             data = await resp.json()
-                            response_text = data.get("response", "Phản hồi thành công.")
+                            if data.get("success") and "message" in data:
+                                response_text = data["message"]
+                            else:
+                                _LOGGER.error(f"[VBot Assist] Lỗi định dạng phản hồi API: {data}")
+                                response_text = f"Không có dữ liệu phản hồi: {data.get('message')}"
                         else:
-                            response_text = f"Lỗi API: HTTP {resp.status}"
+                            error_body = await resp.text()
+                            _LOGGER.error(f"[VBot Assist] Không thể lấy phản hồi từ API: {error_body}")
+                            response_text = "Lỗi khi lấy phản hồi"
 
                 _LOGGER.info(f"[VBot] Gửi API tới {url} với payload: {payload}")
+
 
             else:
                 raise ValueError(f"Luồng xử lý không hợp lệ: {processing_stream}")
