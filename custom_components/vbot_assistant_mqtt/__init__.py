@@ -25,7 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
 
     device_id = entry.data.get(CONF_DEVICE_ID)
     processing_mode = entry.data.get(VBot_PROCESSING_MODE, "chatbot")  # Mặc định là 'chatbot'
-
+    url_api = entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, "192.168.14.113:5002"))
     if device_id:
         # Khởi tạo agent theo chế độ được chọn
         if processing_mode == "chatbot":

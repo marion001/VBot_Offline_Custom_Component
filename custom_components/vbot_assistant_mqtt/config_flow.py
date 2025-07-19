@@ -29,7 +29,6 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors["base"] = "device_exists"
                     break
 
-            # ✅ Nếu hợp lệ, tạo entry
             if not errors:
                 return self.async_create_entry(
                     title=f"VBot Assistant - (Tên Client MQTT: {self.device_id})",
@@ -40,7 +39,6 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
                 )
 
-        # ✅ Form nhập dữ liệu ban đầu
         schema = vol.Schema({
             vol.Required(CONF_DEVICE_ID, default="VBot"): str,
             vol.Required(VBot_URL_API, default="192.168.14.113:5002"): str,
@@ -48,3 +46,36 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         })
 
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    # ✅ Cho phép cấu hình lại
+    async def async_get_options_flow(self, config_entry):
+        return VBotOptionsFlowHandler(config_entry)
+
+
+# ✅ Giao diện "Cấu hình lại"
+class VBotOptionsFlowHandler(config_entries.OptionsFlow):
+    def __init__(self, config_entry):
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        errors = {}
+
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        # Giá trị mặc định lấy từ options → nếu chưa có thì dùng data
+        current_url = self.config_entry.options.get(
+            VBot_URL_API,
+            self.config_entry.data.get(VBot_URL_API, "192.168.14.113:5002")
+        )
+        current_mode = self.config_entry.options.get(
+            VBot_PROCESSING_MODE,
+            self.config_entry.data.get(VBot_PROCESSING_MODE, "chatbot")
+        )
+
+        schema = vol.Schema({
+            vol.Required(VBot_URL_API, default=current_url): str,
+            vol.Required(VBot_PROCESSING_MODE, default=current_mode): vol.In(PROCESSING_MODE_OPTIONS),
+        })
+
+        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
