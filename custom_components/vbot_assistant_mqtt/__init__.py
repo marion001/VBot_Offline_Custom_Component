@@ -24,7 +24,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     device_id = entry.data.get(CONF_DEVICE_ID)
     if device_id:
         agent = VBotAssistantConversationAgent(hass, entry, device_id)
-        conversation.async_set_agent(hass, entry, agent)
+        conversation.async_set_agent(hass, entry, agent, name=f"VBot Assist MQTT ({device_id})")
 
     await hass.config_entries.async_forward_entry_setups(
         entry,
