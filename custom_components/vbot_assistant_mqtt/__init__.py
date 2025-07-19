@@ -9,10 +9,7 @@ from .const import (
     VBot_URL_API,
 )
 
-from .conversation_agent import (
-    VBotAssistantConversationAgent,
-    VBotChatboxConversationAgent,
-)
+from .conversation_agent import VBotConversationAgent
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
@@ -30,11 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     url_api = entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, "192.168.14.113:5002"))
     if device_id:
         # Khởi tạo agent theo chế độ được chọn
-        if processing_mode == "chatbot":
-            agent = VBotChatboxConversationAgent(hass, entry, device_id)
-        else:
-            agent = VBotAssistantConversationAgent(hass, entry, device_id)
-
+        agent = VBotConversationAgent(hass, entry, device_id)
         conversation.async_set_agent(hass, entry, agent)
 
     await hass.config_entries.async_forward_entry_setups(

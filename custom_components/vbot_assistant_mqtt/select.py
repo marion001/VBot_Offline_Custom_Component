@@ -17,6 +17,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if not device:
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
+
+    # MQTT-based selects
     selects = [
         {
             "name": f"Kiểu Hiển Thị Logs Select ({device})",
@@ -27,9 +29,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         }
     ]
 
-    entities = [MQTTSelect(hass, device=device, **s) for s in selects]
-    async_add_entities(entities, update_before_add=True)
+    mqtt_entities = [MQTTSelect(hass, device=device, **s) for s in selects]
+    internal_entities = [ProcessingModeSelect(device)]
 
+    async_add_entities(mqtt_entities + internal_entities, update_before_add=True)
+
+# ✅ MQTT-based Select
 class MQTTSelect(SelectEntity):
     def __init__(self, hass, name, state_topic, command_topic, options, icon=None, device=None):
         self._hass = hass
@@ -89,3 +94,31 @@ class MQTTSelect(SelectEntity):
         )
         self._state = option
         self.async_write_ha_state()
+
+
+# ✅ Internal Select: chế độ xử lý tác nhân
+class ProcessingModeSelect(SelectEntity):
+    def __init__(self, device):
+        self._device = device
+        self._attr_name = f"Chế Độ Xử Lý Tác Nhân Assist ({device})"
+        self._attr_unique_id = f"assist_processing_mode_select_{device.lower()}"
+        self._attr_options = ["chatbot", "processing"]
+        self._attr_icon = "mdi:robot"
+        self._attr_current_option = "chatbot"
+
+    @property
+    def current_option(self):
+        return self._attr_current_option
+
+    async def async_select_option(self, option: str):
+        self._attr_current_option = option
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._device)},
+            "name": f"{self._device} VBot Assistant",
+            "manufacturer": "Vũ Tuyển",
+            "model": "VBot Assistant MQTT"
+        }
