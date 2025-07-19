@@ -103,7 +103,7 @@ class ProcessingModeSelect(SelectEntity):
     def __init__(self, device):
         self._device = device
         self._attr_name = f"Assist Tác Nhân Chế Độ Xử Lý ({device})"
-        #self._attr_unique_id = f"{device.lower()}_assist_processing_mode_select"
+        self._attr_unique_id = f"{device.lower()}_assist_processing_mode_select"
         self._attr_options = ["chatbot_processing", "main_processing"]
         self._attr_icon = "mdi:robot"
         self._attr_current_option = "chatbot_processing"
@@ -130,7 +130,7 @@ class ProcessingStreamSelect(SelectEntity):
     def __init__(self, device):
         self._device = device
         self._attr_name = f"Assist Tác Nhân Luồng Xử Lý ({device})"
-        self._attr_unique_id = f"assist_stream_select_{device.lower()}"
+        self._attr_unique_id = f"{device.lower()}_assist_stream_select"
         self._attr_options = ["api", "mqtt"]
         self._attr_icon = "mdi:transfer-right"
         self._attr_current_option = "api"  # hoặc bạn chọn mặc định là "api"
