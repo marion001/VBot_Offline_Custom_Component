@@ -3,7 +3,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components import conversation
 
 from .const import DOMAIN, CONF_DEVICE_ID
-#from .conversation_agent import VBotAssistantConversationAgent
 from .conversation_agent import VBotAssistantConversationAgent, VBotChatboxConversationAgent
 
 
