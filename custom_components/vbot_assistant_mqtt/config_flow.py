@@ -36,8 +36,13 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_DEVICE_ID: self.device_id,
                         VBot_URL_API: url_api,
                         VBot_PROCESSING_MODE: processing_mode,
+                    },
+                    options={
+                        VBot_URL_API: url_api,
+                        VBot_PROCESSING_MODE: processing_mode,
                     }
                 )
+
 
         schema = vol.Schema({
             vol.Required(CONF_DEVICE_ID, default="VBot"): str,
