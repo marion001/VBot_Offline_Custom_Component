@@ -6,7 +6,9 @@ from .const import (
     DOMAIN,
     CONF_DEVICE_ID,
     VBot_PROCESSING_MODE,
+    VBot_URL_API,
 )
+
 from .conversation_agent import (
     VBotAssistantConversationAgent,
     VBotChatboxConversationAgent,
