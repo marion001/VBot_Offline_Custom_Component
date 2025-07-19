@@ -24,7 +24,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     device_id = entry.data.get(CONF_DEVICE_ID)
     if device_id:
         agent = VBotAssistantConversationAgent(hass, entry, device_id)
-        conversation.async_set_agent(hass, entry, agent, name=f"VBot Assist MQTT ({device_id})")
+        conversation.async_set_agent(hass, entry, agent)
+
+        # Agent 2: Chatbox (dùng ID riêng)
+        chatbox_agent = VBotChatboxConversationAgent(hass, entry, device_id)
+        conversation.async_set_agent(hass, entry, chatbox_agent, agent_id=f"{device_id}_chatbox")
 
     await hass.config_entries.async_forward_entry_setups(
         entry,
