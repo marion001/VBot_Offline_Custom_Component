@@ -1,37 +1,35 @@
 import logging
-from homeassistant.core import HomeAssistant
 from homeassistant.components import mqtt
+from homeassistant.components import conversation
+from homeassistant.helpers import intent
 
 _LOGGER = logging.getLogger(__name__)
 
-class VBotAssistAgent:
-    """Agent tùy chỉnh đơn giản mà không kế thừa AbstractAssistAgent"""
-
-    def __init__(self, hass: HomeAssistant, device_id: str):
+class VBotAssistantConversationAgent(conversation.AbstractConversationAgent):
+    def __init__(self, hass, entry, device_id: str):
         self.hass = hass
+        self.entry = entry
         self.device_id = device_id
-
-    @property
-    def name(self) -> str:
-        return f"VBot Assist MQTT ({self.device_id})"
-
-    @property
-    def id(self) -> str:
-        return f"vbot_{self.device_id}"
 
     @property
     def supported_languages(self) -> list[str]:
         return ["vi"]
 
-    async def async_process(self, text_input: str, context=None):
+    async def async_process(self, user_input: conversation.ConversationInput) -> conversation.ConversationResult:
+        message = user_input.text or "Không có đầu vào"
         topic = f"{self.device_id}/script/main_processing/set"
-        try:
-            await mqtt.async_publish(self.hass, topic, text_input, qos=1, retain=False)
-            _LOGGER.debug(f"[VBotAssistAgent] Gửi '{text_input}' đến {topic}")
-        except Exception as e:
-            _LOGGER.error(f"[VBotAssistAgent] Lỗi gửi MQTT: {e}")
 
-        return {
-            "plain_speech": {"speech": "VBot đã nhận lệnh."},
-            "success": True,
-        }
+        try:
+            await mqtt.async_publish(self.hass, topic, message, qos=1, retain=False)
+            _LOGGER.info(f"[VBot] Gửi tới {topic}: {message}")
+            response_text = "Đã gửi lệnh tới VBot."
+        except Exception as e:
+            _LOGGER.error(f"[VBot] Lỗi khi gửi MQTT: {e}")
+            response_text = "Không thể gửi lệnh tới thiết bị."
+
+        intent_response = intent.IntentResponse(language=user_input.language)
+        intent_response.async_set_speech(response_text)
+        return conversation.ConversationResult(
+            response=intent_response,
+            conversation_id=user_input.conversation_id
+        )
