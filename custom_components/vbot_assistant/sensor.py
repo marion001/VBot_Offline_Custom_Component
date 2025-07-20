@@ -2,11 +2,11 @@ import logging
 import aiohttp
 import json
 from datetime import timedelta
-from urllib.parse import urlparse
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import NoEntitySpecifiedError
 from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,6 +25,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if not url_api:
         _LOGGER.error("Không tìm thấy URL API trong mục cấu hình")
         return
+    # Kiểm tra kết nối tới API
+    test_url = f"http://{url_api.split(':')[0]}/VBot_API.php"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(test_url, timeout=3) as res:
+                if res.status != 200:
+                    _LOGGER.error(f"URL API {test_url} trả về mã trạng thái {res.status}")
+                    return
+    except Exception as e:
+        _LOGGER.error(f"Không thể kết nối tới URL API {test_url}: {e}")
+        return
+
     sensors = [
         {
             "name": f"Ngày Phát Hành Giao Diện Sensor ({device})",
@@ -53,7 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "check_new_version": True,
             "version_type": "interface",
             "url_api": url_api,
-            "update_interval": 60  # Cập nhật mỗi 1 giờ
+            "update_interval": 3600  # Cập nhật mỗi 1 giờ
         },
         {
             "name": f"Phiên Bản Chương Trình Mới ({device})",
@@ -62,7 +74,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "check_new_version": True,
             "version_type": "program",
             "url_api": url_api,
-            "update_interval": 60  # Cập nhật mỗi 1 giờ
+            "update_interval": 3600  # Cập nhật mỗi 1 giờ
         },
     ]
 
@@ -74,7 +86,7 @@ class MQTTSensor(SensorEntity):
         self._hass = hass
         self._name = name
         self._device = device
-        self._attr_unique_id = f"{device.lower()}_{state_topic.replace('/', '_').replace(':', '_')}_sensor"
+        self._attr_unique_id = f"{DOMAIN}_{device.lower()}_{state_topic.replace('/', '_').replace(':', '_')}_sensor"
         self._state_topic = state_topic
         self._attr_icon = icon or "mdi:tune"
         self._attr_unit_of_measurement = None
@@ -86,6 +98,7 @@ class MQTTSensor(SensorEntity):
         self._github_branch = "main"
         if update_interval:
             self._attr_update_interval = timedelta(seconds=update_interval)
+        self._attr_entity_id = f"sensor.{DOMAIN}_{device.lower()}_{name.lower().replace(' ', '_').replace('(', '').replace(')', '')}"
 
     async def async_added_to_hass(self):
         if self._state_topic:
@@ -107,13 +120,19 @@ class MQTTSensor(SensorEntity):
             self._state = await self._check_version_update(payload)
         else:
             self._state = payload
-        self.async_write_ha_state()
+        try:
+            self.async_write_ha_state()
+        except NoEntitySpecifiedError as e:
+            _LOGGER.error(f"Lỗi khi ghi trạng thái cho {self._name}: {e}")
 
     async def async_update(self):
         """Cập nhật trạng thái định kỳ cho sensor có update_interval."""
         if self._check_new_version:
             self._state = await self._check_version_update(None)
-            self.async_write_ha_state()
+            try:
+                self.async_write_ha_state()
+            except NoEntitySpecifiedError as e:
+                _LOGGER.error(f"Lỗi khi ghi trạng thái định kỳ cho {self._name}: {e}")
 
     async def _check_version_update(self, local_version):
         """Kiểm tra xem có phiên bản mới trên GitHub hay không."""
@@ -126,7 +145,7 @@ class MQTTSensor(SensorEntity):
                 # Lấy phiên bản từ API nội bộ
                 async with session.get(api_url, timeout=5) as res:
                     if res.status != 200:
-                        _LOGGER.error(f"Lỗi khi lấy dữ liệu từ API nội bộ: {res.status}")
+                        _LOGGER.error(f"Lỗi khi lấy dữ liệu từ API nội bộ {api_url}: {res.status}")
                         return "Không"
                     data = await res.json()
                     local_version = data['version'][self._version_type]
@@ -139,8 +158,14 @@ class MQTTSensor(SensorEntity):
                     if res.status != 200:
                         _LOGGER.error(f"Lỗi khi lấy file {file_path} từ GitHub: {res.status}")
                         return "Không"
-                    github_data = await res.json()
-                    github_version = github_data.get('releaseDate')
+                    # Sử dụng text() vì API trả về raw text
+                    raw_data = await res.text()
+                    try:
+                        github_data = json.loads(raw_data)
+                        github_version = github_data.get('releaseDate')
+                    except json.JSONDecodeError as e:
+                        _LOGGER.error(f"Lỗi khi phân tích JSON từ GitHub cho {file_path}: {e}")
+                        return "Không"
 
                 # So sánh phiên bản
                 if github_version and local_version and github_version != local_version:
