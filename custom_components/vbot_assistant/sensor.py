@@ -60,33 +60,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         },
         {
             "name": f"Phiên Bản Giao Diện Mới ({device})",
-            "state_topic": f"{device}/sensor/vbot_interface_new_version/state",
             "icon": "mdi:update",
             "check_new_version": True,
             "version_type": "interface",
-            "url_api": url_api,
-            "update_interval": 3600  # Cập nhật mỗi 1 giờ
+            "update_interval": 3600
         },
         {
             "name": f"Phiên Bản Chương Trình Mới ({device})",
-            "state_topic": f"{device}/sensor/vbot_program_new_version/state",
             "icon": "mdi:update",
             "check_new_version": True,
             "version_type": "program",
-            "url_api": url_api,
-            "update_interval": 3600  # Cập nhật mỗi 1 giờ
+            "update_interval": 3600
         },
     ]
 
-    entities = [MQTTSensor(hass, device=device, **s) for s in sensors]
+    # Truyền url_api vào MQTTSensor thông qua tham số
+    entities = [MQTTSensor(hass, device=device, url_api=url_api, **s) for s in sensors]
     async_add_entities(entities, update_before_add=True)
 
 class MQTTSensor(SensorEntity):
-    def __init__(self, hass, name, state_topic, icon=None, device=None, check_new_version=False, version_type=None, url_api=None, update_interval=None):
+    def __init__(self, hass, name, state_topic=None, icon=None, device=None, check_new_version=False, version_type=None, url_api=None, update_interval=None):
         self._hass = hass
         self._name = name
         self._device = device
-        self._attr_unique_id = f"{DOMAIN}_{device.lower()}_{state_topic.replace('/', '_').replace(':', '_')}_sensor"
+        # Chuẩn hóa name để tạo entity_id
+        sanitized_name = name.lower().replace(' ', '_').replace('(', '').replace(')', '').replace(':', '').replace('/', '_')
+        self._attr_entity_id = f"sensor.{sanitized_name}"
+        self._attr_unique_id = f"{DOMAIN}_{device.lower()}_{sanitized_name}_sensor"
         self._state_topic = state_topic
         self._attr_icon = icon or "mdi:tune"
         self._attr_unit_of_measurement = None
@@ -98,7 +98,7 @@ class MQTTSensor(SensorEntity):
         self._github_branch = "main"
         if update_interval:
             self._attr_update_interval = timedelta(seconds=update_interval)
-        self._attr_entity_id = f"sensor.{DOMAIN}_{device.lower()}_{name.lower().replace(' ', '_').replace('(', '').replace(')', '')}"
+        _LOGGER.debug(f"Khởi tạo sensor {self._name} với unique_id: {self._attr_unique_id}, entity_id: {self._attr_entity_id}")
 
     async def async_added_to_hass(self):
         if self._state_topic:
@@ -116,12 +116,12 @@ class MQTTSensor(SensorEntity):
             return
 
         _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
-        if self._check_new_version:
-            self._state = await self._check_version_update(payload)
-        else:
-            self._state = payload
+        self._state = payload
         try:
-            self.async_write_ha_state()
+            if self.entity_id:
+                self.async_write_ha_state()
+            else:
+                _LOGGER.error(f"Không thể ghi trạng thái cho {self._name}: entity_id chưa được gán")
         except NoEntitySpecifiedError as e:
             _LOGGER.error(f"Lỗi khi ghi trạng thái cho {self._name}: {e}")
 
@@ -130,7 +130,10 @@ class MQTTSensor(SensorEntity):
         if self._check_new_version:
             self._state = await self._check_version_update(None)
             try:
-                self.async_write_ha_state()
+                if self.entity_id:
+                    self.async_write_ha_state()
+                else:
+                    _LOGGER.error(f"Không thể ghi trạng thái định kỳ cho {self._name}: entity_id chưa được gán")
             except NoEntitySpecifiedError as e:
                 _LOGGER.error(f"Lỗi khi ghi trạng thái định kỳ cho {self._name}: {e}")
 
@@ -158,7 +161,6 @@ class MQTTSensor(SensorEntity):
                     if res.status != 200:
                         _LOGGER.error(f"Lỗi khi lấy file {file_path} từ GitHub: {res.status}")
                         return "Không"
-                    # Sử dụng text() vì API trả về raw text
                     raw_data = await res.text()
                     try:
                         github_data = json.loads(raw_data)
