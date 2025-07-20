@@ -29,7 +29,6 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
         mode_state = self.hass.states.get(mode_entity_id)
         processing_mode = mode_state.state if mode_state else "chatbot"
 
-
         stream_state = self.hass.states.get(stream_entity_id)
         processing_stream = stream_state.state if stream_state else "mqtt"
         _LOGGER.info(f"[VBot] processing_stream: {processing_stream}")

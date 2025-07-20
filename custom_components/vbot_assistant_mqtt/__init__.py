@@ -5,7 +5,6 @@ from homeassistant.components import conversation
 from .const import (
     DOMAIN,
     CONF_DEVICE_ID,
-    VBot_PROCESSING_MODE,
     VBot_URL_API,
 )
 
