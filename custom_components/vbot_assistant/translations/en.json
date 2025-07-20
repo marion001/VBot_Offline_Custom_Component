@@ -1,9 +1,9 @@
 {
-    "title": "VBot Assistant MQTT",
+    "title": "VBot Assistant",
     "config": {
         "step": {
             "user": {
-                "title": "Liên Kết VBot Assistant MQTT",
+                "title": "Liên Kết VBot Assistant",
                 "description": "Nhập Tên Client tương ứng trong (Cấu Hình Config -> Cấu Hình Kết Nối MQTT Broker) của loa VBot",
                 "data": {
                     "device_id": "Tên Client MQTT Của Loa VBot",

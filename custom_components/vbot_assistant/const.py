@@ -1,4 +1,4 @@
-DOMAIN = "vbot_assistant_mqtt"
+DOMAIN = "vbot_assistant"
 
 #Tên Client MQTT (Client ID MQTT) Của Loa VBot
 CONF_DEVICE_ID = "device_id"

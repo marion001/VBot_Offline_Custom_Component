@@ -117,9 +117,9 @@ class ProcessingModeSelect(SelectEntity):
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assist",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant Assist API"
+            "model": "VBot Assistant MQTT"
         }
 
 #Lựa Chọn luồng xử lý API hoặc MQTT
@@ -146,7 +146,7 @@ class ProcessingStreamSelect(SelectEntity):
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assist",
+            "name": f"{self._device} VBot Assistant",
             "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant Assist API"
+            "model": "VBot Assistant MQTT"
         }

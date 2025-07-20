@@ -1,9 +1,9 @@
 {
-  "domain": "vbot_assistant_mqtt",
-  "name": "VBot Assistant MQTT",
+  "domain": "vbot_assistant",
+  "name": "VBot Assistant",
   "version": "1.0.1",
   "documentation": "https://github.com/marion001/VBot-Assistant-MQTT-HASS",
-  "requirements": [],
+  "requirements": ["aiohttp"],
   "dependencies": ["mqtt"],
   "codeowners": ["@marion001"],
   "config_flow": true,
