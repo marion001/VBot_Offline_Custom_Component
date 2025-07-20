@@ -83,10 +83,14 @@ class MQTTSensor(SensorEntity):
         self._hass = hass
         self._name = name
         self._device = device
-        # Chuẩn hóa name để tạo entity_id
+
+        # Thay vì tự tạo entity_id, chỉ cần đặt name (HA sẽ tự sinh)
+        self._attr_name = name
+
+        # Tạo sanitized_name để dùng cho unique_id (không dùng cho entity_id nữa)
         sanitized_name = name.lower().replace(' ', '_').replace('(', '').replace(')', '').replace(':', '').replace('/', '_')
-        self._attr_entity_id = f"sensor.{sanitized_name}"
         self._attr_unique_id = f"{DOMAIN}_{device.lower()}_{sanitized_name}_sensor"
+
         self._state_topic = state_topic
         self._attr_icon = icon or "mdi:tune"
         self._attr_unit_of_measurement = None
@@ -96,9 +100,11 @@ class MQTTSensor(SensorEntity):
         self._url_api = url_api
         self._github_repo = "marion001/VBot_Offline"
         self._github_branch = "main"
+
         if update_interval:
             self._attr_update_interval = timedelta(seconds=update_interval)
-        _LOGGER.debug(f"Khởi tạo sensor {self._name} với unique_id: {self._attr_unique_id}, entity_id: {self._attr_entity_id}")
+
+        _LOGGER.debug(f"Khởi tạo sensor '{self._name}' với unique_id: {self._attr_unique_id}")
 
     async def async_added_to_hass(self):
         if self._state_topic:
@@ -118,12 +124,10 @@ class MQTTSensor(SensorEntity):
         _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
         self._state = payload
         try:
-            if self.entity_id:
-                self.async_write_ha_state()
-            else:
-                _LOGGER.error(f"Không thể ghi trạng thái cho {self._name}: entity_id chưa được gán")
-        except NoEntitySpecifiedError as e:
-            _LOGGER.error(f"Lỗi khi ghi trạng thái cho {self._name}: {e}")
+            self.async_write_ha_state()
+        except Exception as e:
+            _LOGGER.error(f"Lỗi khi ghi trạng thái định kỳ cho {self._name}: {e}")
+
 
     async def async_update(self):
         """Cập nhật trạng thái định kỳ cho sensor có update_interval."""
