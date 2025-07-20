@@ -1,7 +1,5 @@
-# VBot_Offline_Custom_Component
-Custom Component VBot Assistant
-- Liên Kết VBot Assistant Vào Home Assistant (HASS) Thông Qua Giao Thức MQTT
-- Liên KếtVBot Assistan Làm Tác Nhân Assist Trong Home Assistant (HASS) Qua Giao Thức API
+# VBot-Assistant-MQTT-HASS
+Custom Component Tích Hợp VBot Assistant Tới Home Assistant (HASS) Thông Qua Giao Thức MQTT
 
 Trang Chính VBot Assistant: https://github.com/marion001/VBot_Offline
 - Group Hệ Hỗ Trợ: [Facebook - Group](https://www.facebook.com/groups/1148385343358824)
