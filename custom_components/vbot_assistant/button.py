@@ -111,14 +111,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "name": f"Main Processing Button ({device})",
             "icon": "mdi:robot-confused-outline",
             "topic": f"{device}/script/main_processing/set",
-            "template_input": f"text.{device.lower()}_main_processing"
+            "template_input": f"text.main_processing_text_{device.lower()}"
         },
         {
             "id": f"{device}_vbot_tts",
             "name": f"VBot TTS Button ({device})",
             "icon": "mdi:robot-confused-outline",
             "topic": f"{device}/script/vbot_tts/set",
-            "template_input": f"text.{device.lower()}_vbot_tts"
+            "template_input": f"text.vbot_tts_text_{device.lower()}"
         }
     ]
 
