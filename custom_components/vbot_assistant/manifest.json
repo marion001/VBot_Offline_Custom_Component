@@ -8,5 +8,5 @@
   "codeowners": ["@marion001"],
   "config_flow": true,
   "conversation": true,
-  "platforms": ["switch", "number", "sensor", "select", "button", "text", "media_player"]
+  "platforms": ["switch", "number", "sensor", "select", "button", "text", "media_player", "tts"]
 }
