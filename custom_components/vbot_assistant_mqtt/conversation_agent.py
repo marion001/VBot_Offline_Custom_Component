@@ -22,17 +22,21 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
 
         # 🧠 Lấy chế độ xử lý: chatbot / processing
         mode_entity_id = f"select.assist_tac_nhan_che_do_xu_ly_{self.device_id.lower()}"
+        
+        # 🧠 Lấy luồng xử lý: api / mqtt select.assist_tac_nhan_luong_xu_ly_vbot_dev_222_2
+        stream_entity_id = f"select.assist_tac_nhan_luong_xu_ly_{self.device_id.lower()}"
+
         mode_state = self.hass.states.get(mode_entity_id)
         processing_mode = mode_state.state if mode_state else "chatbot"
 
-        # 🧠 Lấy luồng xử lý: api / mqtt select.assist_tac_nhan_luong_xu_ly_vbot_dev_222_2
-        stream_entity_id = f"select.assist_tac_nhan_luong_xu_ly_{self.device_id.lower()}"
+
         stream_state = self.hass.states.get(stream_entity_id)
         processing_stream = stream_state.state if stream_state else "mqtt"
-
+        _LOGGER.info(f"[VBot] processing_stream: {processing_stream}")
+        
         # 🔍 Chuẩn hóa lại chế độ xử lý: "chatbot" / "processing"
         vbot_mode = "chatbot" if "chatbot" in processing_mode else "processing"
-
+        _LOGGER.info(f"[VBot] vbot_mode: {vbot_mode}")
         intent_response = intent.IntentResponse(language=user_input.language)
 
         try:
