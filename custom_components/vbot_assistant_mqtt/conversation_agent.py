@@ -20,6 +20,7 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
     async def async_process(self, user_input: conversation.ConversationInput) -> conversation.ConversationResult:
         message = user_input.text
         if not message or not message.strip():
+            #Trả lại kết quả cho Assist
             response_text = "Vui lòng nhập tin nhắn"
             intent_response = intent.IntentResponse(language=user_input.language)
             intent_response.async_set_speech(response_text)
@@ -65,7 +66,7 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                             error_body = await resp.text()
                             _LOGGER.error(f"[VBot Assist] Không thể lấy phản hồi từ API: {error_body}")
                             response_text = "Lỗi khi lấy dữ liệu phản hồi"
-            #Luồng MQTT
+            #Luồng MQTT (Đang Vô Hiệu)
             elif processing_stream == "mqtt":
                 topic = f"{self.device_id}/script/main_{processing_mode}/set"
                 await mqtt.async_publish(self.hass, topic, message, qos=1, retain=False)
@@ -77,7 +78,7 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
             _LOGGER.error(f"[VBot Assist] Lỗi khi gửi lệnh: {e}")
             response_text = "Không thể gửi lệnh tới thiết bị."
 
-        # 🔁 Trả lại kết quả cho Assist
+        #Trả lại kết quả cho Assist
         intent_response.async_set_speech(response_text)
         intent_response.async_set_card(
             title="VBot Assist",
