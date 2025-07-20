@@ -122,7 +122,7 @@ class MQTTSensor(SensorEntity):
         try:
             async with aiohttp.ClientSession() as session:
                 # Lấy phiên bản từ API nội bộ
-                async with session.get(self._url_api, timeout=5) as res:
+                async with session.get(f"http://{self._url_api}/VBot_API.php", timeout=5) as res:
                     if res.status != 200:
                         _LOGGER.error(f"Lỗi khi lấy dữ liệu từ API nội bộ: {res.status}")
                         return "Không"
