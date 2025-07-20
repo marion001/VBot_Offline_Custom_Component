@@ -2,6 +2,7 @@ import logging
 import aiohttp
 import json
 from datetime import timedelta
+from urllib.parse import urlparse
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
@@ -119,10 +120,11 @@ class MQTTSensor(SensorEntity):
         if not self._url_api:
             _LOGGER.error(f"Không có URL API cho {self._name}")
             return "Không"
+        api_url = f"http://{self._url_api.split(':')[0]}/VBot_API.php"
         try:
             async with aiohttp.ClientSession() as session:
                 # Lấy phiên bản từ API nội bộ
-                async with session.get(f"http://{self._url_api}/VBot_API.php", timeout=5) as res:
+                async with session.get(api_url, timeout=5) as res:
                     if res.status != 200:
                         _LOGGER.error(f"Lỗi khi lấy dữ liệu từ API nội bộ: {res.status}")
                         return "Không"
