@@ -26,7 +26,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
 
     await hass.config_entries.async_forward_entry_setups(
         entry,
-        ["switch", "number", "sensor", "select", "button", "text", "media_player"]
+        ["switch", "number", "sensor", "select", "button", "text", "media_player", "tts"]
     )
     return True
 
@@ -34,7 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
 async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     await hass.config_entries.async_unload_platforms(
         entry,
-        ["switch", "number", "sensor", "select", "button", "text", "media_player"]
+        ["switch", "number", "sensor", "select", "button", "text", "media_player", "tts"]
     )
     hass.data[DOMAIN].pop(entry.entry_id, None)
     conversation.async_unset_agent(hass, entry)
