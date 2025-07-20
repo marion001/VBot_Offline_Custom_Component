@@ -3,6 +3,7 @@
   "name": "VBot Assistant",
   "version": "1.0.1",
   "documentation": "https://github.com/marion001/VBot-Assistant-MQTT-HASS",
+  "issue_tracker": "https://github.com/marion001/VBot-Assistant-MQTT-HASS/issues",
   "requirements": ["aiohttp"],
   "dependencies": ["mqtt"],
   "dependencies": ["conversation", "mqtt"],
