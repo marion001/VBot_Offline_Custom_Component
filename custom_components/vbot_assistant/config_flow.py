@@ -27,7 +27,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             if not errors:
                 return self.async_create_entry(
-                    title=f"VBot Assistant - (Tên Client MQTT: {self.device_id})",
+                    title=f"VBot Assistant {url_api.split(':')[0]} - (Tên Client MQTT: {self.device_id})",
                     data={
                         CONF_DEVICE_ID: self.device_id,
                         VBot_URL_API: url_api,
