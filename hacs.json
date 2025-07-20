@@ -1,6 +1,6 @@
 {
-  "name": "VBot Assistant MQTT",
-  "domain": "vbot_assistant_mqtt",
+  "name": "VBot Assistant",
+  "domain": "vbot_assistant",
   "homeassistant": "2023.0.0",
   "render_readme": true,
   "country": "VN",
