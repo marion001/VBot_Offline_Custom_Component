@@ -83,10 +83,12 @@ class MQTTSensor(SensorEntity):
         self._hass = hass
         self._name = name
         self._device = device
-        # Chuẩn hóa name để tạo entity_id
-        sanitized_name = name.lower().replace(' ', '_').replace('(', '').replace(')', '').replace(':', '').replace('/', '_')
-        self._attr_entity_id = f"sensor.{sanitized_name}"
-        self._attr_unique_id = f"{DOMAIN}_{device.lower()}_{sanitized_name}_sensor"
+        # Gán unique_id dựa trên version_type hoặc state_topic
+        if check_new_version and version_type:
+            self._attr_unique_id = f"{DOMAIN}_{version_type}_{device.lower()}"
+        else:
+            unique_id_base = state_topic.replace('/', '_').replace(':', '_') if state_topic else name.lower().replace(' ', '_')
+            self._attr_unique_id = f"{DOMAIN}_{unique_id_base}_sensor"
         self._state_topic = state_topic
         self._attr_icon = icon or "mdi:tune"
         self._attr_unit_of_measurement = None
@@ -98,7 +100,7 @@ class MQTTSensor(SensorEntity):
         self._github_branch = "main"
         if update_interval:
             self._attr_update_interval = timedelta(seconds=update_interval)
-        _LOGGER.debug(f"Khởi tạo sensor {self._name} với unique_id: {self._attr_unique_id}, entity_id: {self._attr_entity_id}")
+        _LOGGER.debug(f"Khởi tạo sensor {self._name} với unique_id: {self._attr_unique_id}")
 
     async def async_added_to_hass(self):
         if self._state_topic:
