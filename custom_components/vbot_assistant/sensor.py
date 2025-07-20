@@ -83,12 +83,6 @@ class MQTTSensor(SensorEntity):
         self._hass = hass
         self._name = name
         self._device = device
-        # Gán unique_id dựa trên version_type hoặc state_topic
-        if check_new_version and version_type:
-            self._attr_unique_id = f"{DOMAIN}_{version_type}_{device.lower()}"
-        else:
-            unique_id_base = state_topic.replace('/', '_').replace(':', '_') if state_topic else name.lower().replace(' ', '_')
-            self._attr_unique_id = f"{DOMAIN}_{unique_id_base}_sensor"
         self._state_topic = state_topic
         self._attr_icon = icon or "mdi:tune"
         self._attr_unit_of_measurement = None
@@ -100,7 +94,7 @@ class MQTTSensor(SensorEntity):
         self._github_branch = "main"
         if update_interval:
             self._attr_update_interval = timedelta(seconds=update_interval)
-        _LOGGER.debug(f"Khởi tạo sensor {self._name} với unique_id: {self._attr_unique_id}")
+        _LOGGER.debug(f"Khởi tạo sensor {self._name}")
 
     async def async_added_to_hass(self):
         if self._state_topic:
@@ -130,7 +124,21 @@ class MQTTSensor(SensorEntity):
     async def async_update(self):
         """Cập nhật trạng thái định kỳ cho sensor có update_interval."""
         if self._check_new_version:
-            self._state = await self._check_version_update(None)
+            state = await self._check_version_update(None)
+            try:
+                # Ghi trạng thái trực tiếp vào entity_id cố định
+
+                if self._version_type == "interface":
+                    entity_id = f"sensor.phien_ban_giao_dien_moi_{self._device}"
+                else:
+                    entity_id = f"sensor.phien_ban_chuong_trinh_moi_{self._device}"
+
+
+                self._hass.states.async_set(entity_id, state, {"friendly_name": self._name, "icon": self._attr_icon})
+                _LOGGER.debug(f"Ghi trạng thái {state} vào {entity_id} cho {self._name}")
+            except Exception as e:
+                _LOGGER.error(f"Lỗi khi ghi trạng thái cho {self._name} vào {entity_id}: {e}")
+        else:
             try:
                 if self.entity_id:
                     self.async_write_ha_state()
