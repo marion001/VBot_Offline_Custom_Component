@@ -9,20 +9,24 @@ class VBotTTSProvider(Provider):
         self._name = f"VBot TTS {self.device}"
 
     @property
-    def default_language(self):
+    def default_language(self) -> str:
         return "vi"
 
     @property
-    def supported_languages(self):
+    def supported_languages(self) -> list[str]:
         return ["vi"]
 
     @property
-    def supported_options(self):
+    def supported_options(self) -> list[str]:
         return []
 
     @property
-    def default_options(self):
+    def default_options(self) -> dict[str, str]:
         return {}
+
+    @property
+    def name(self) -> str:
+        return f"vbot_assistant_{self.device}"
 
     async def async_get_tts_audio(self, message, language, options=None):
         # Gửi message tới MQTT hoặc API ở đây

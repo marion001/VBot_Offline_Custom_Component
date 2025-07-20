@@ -4,6 +4,8 @@ from homeassistant.components import conversation
 from homeassistant.components.tts import DOMAIN as TTS_DOMAIN
 from .tts import VBotTTSProvider
 
+from homeassistant.components import tts
+
 from .const import (
     DOMAIN,
     CONF_DEVICE_ID,
@@ -27,15 +29,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
         agent = VBotConversationAgent(hass, entry, device_id)
         conversation.async_set_agent(hass, entry, agent)
 
-    # Đăng ký TTS provider nếu domain TTS đã được khởi tạo
-    if TTS_DOMAIN in hass.data:
-        provider = VBotTTSProvider(hass, {"device": device_id})
-        hass.data[TTS_DOMAIN][f"{DOMAIN}_{device_id}"] = provider
+    # Đăng ký TTS Provider đúng cách
+    provider = VBotTTSProvider(hass, {"device": device_id})
+    tts.async_register_provider(hass, provider)
 
     # Forward các platform
     await hass.config_entries.async_forward_entry_setups(
         entry,
-        ["switch", "number", "sensor", "select", "button", "text", "media_player"]
+        ["switch", "number", "sensor", "select", "button", "text", "media_player", "tts"]
     )
 
     return True
@@ -43,7 +44,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
 async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     await hass.config_entries.async_unload_platforms(
         entry,
-        ["switch", "number", "sensor", "select", "button", "text", "media_player"]
+        ["switch", "number", "sensor", "select", "button", "text", "media_player", "tts"]
     )
     hass.data[DOMAIN].pop(entry.entry_id, None)
     conversation.async_unset_agent(hass, entry)
