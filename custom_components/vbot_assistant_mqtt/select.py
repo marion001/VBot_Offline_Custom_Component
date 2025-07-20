@@ -18,7 +18,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
 
-    # MQTT-based selects
     selects = [
         {
             "name": f"Kiểu Hiển Thị Logs Select ({device})",
@@ -36,7 +35,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
     async_add_entities(mqtt_entities + internal_entities, update_before_add=True)
 
-# ✅ MQTT-based Select
 class MQTTSelect(SelectEntity):
     def __init__(self, hass, name, state_topic, command_topic, options, icon=None, device=None):
         self._hass = hass
@@ -97,8 +95,7 @@ class MQTTSelect(SelectEntity):
         self._state = option
         self.async_write_ha_state()
 
-
-# ✅ Internal Select: chế độ xử lý tác nhân
+#Chế độ cho tác Nhân VBot Assist xử lý
 class ProcessingModeSelect(SelectEntity):
     def __init__(self, device):
         self._device = device
@@ -125,7 +122,7 @@ class ProcessingModeSelect(SelectEntity):
             "model": "VBot Assistant MQTT"
         }
 
-# ✅ Internal Select: luồng xử lý API hoặc MQTT
+#Lựa Chọn luồng xử lý API hoặc MQTT
 class ProcessingStreamSelect(SelectEntity):
     def __init__(self, device):
         self._device = device
@@ -134,7 +131,8 @@ class ProcessingStreamSelect(SelectEntity):
         #self._attr_options = ["api", "mqtt"]
         self._attr_options = ["api"]
         self._attr_icon = "mdi:transfer-right"
-        self._attr_current_option = "api"  # hoặc bạn chọn mặc định là "api"
+        #Mặc Định chọn API
+        self._attr_current_option = "api"
 
     @property
     def current_option(self):

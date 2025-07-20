@@ -10,11 +10,9 @@ from .const import (
 
 from .conversation_agent import VBotConversationAgent
 
-
 async def async_setup(hass: HomeAssistant, config: dict):
     """Hàm khởi tạo chung, không làm gì nếu không dùng YAML."""
     return True
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     """Gọi khi người dùng thêm 1 cấu hình integration."""
@@ -33,7 +31,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
         ["switch", "number", "sensor", "select", "button", "text", "media_player"]
     )
     return True
-
 
 async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     """Gỡ bỏ khi người dùng xóa cấu hình."""

@@ -6,7 +6,6 @@ from .const import (
     VBot_URL_API
 )
 
-
 class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
@@ -20,7 +19,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.device_id = user_input[CONF_DEVICE_ID].strip()
             url_api = user_input[VBot_URL_API].strip()
 
-            # ✅ Kiểm tra trùng device_id với các entry đã tồn tại
+            #Kiểm tra trùng device_id với các entry đã tồn tại
             for entry in self._async_current_entries():
                 if entry.data.get(CONF_DEVICE_ID) == self.device_id:
                     errors["base"] = "device_exists"
@@ -50,7 +49,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return VBotOptionsFlowHandler(config_entry)
 
 
-# ✅ Giao diện "Cấu hình lại"
+#Giao diện Cấu hình lại
 class VBotOptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry):
         self._config_entry = config_entry

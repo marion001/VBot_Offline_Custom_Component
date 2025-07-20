@@ -20,7 +20,7 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
     async def async_process(self, user_input: conversation.ConversationInput) -> conversation.ConversationResult:
         message = user_input.text
         if not message or not message.strip():
-            response_text = "Vui lòng nhập văn bản để tiếp tục."
+            response_text = "Vui lòng nhập tin nhắn"
             intent_response = intent.IntentResponse(language=user_input.language)
             intent_response.async_set_speech(response_text)
             intent_response.async_set_card(
