@@ -48,7 +48,7 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
 
             elif processing_stream == "api":
                 # 🌐 Gửi qua API
-                url = f"{self.base_url}/"
+                url = f"http://{self.base_url}/"
                 payload = {
                     "type": 3,
                     "data": "main_processing",
@@ -80,7 +80,7 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                 raise ValueError(f"Luồng xử lý không hợp lệ: {processing_stream}")
 
         except Exception as e:
-            _LOGGER.error(f"[VBot] Lỗi khi gửi lệnh: {e}")
+            _LOGGER.error(f"[VBot Assist] Lỗi khi gửi lệnh: {e}")
             response_text = "Không thể gửi lệnh tới thiết bị."
 
         # 🔁 Trả lại kết quả cho Assist
