@@ -18,30 +18,30 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
         return ["vi"]
 
     async def async_process(self, user_input: conversation.ConversationInput) -> conversation.ConversationResult:
-        message = user_input.text or "Không có đầu vào"
+        message = user_input.text
+        if not message or not message.strip():
+            response_text = "Vui lòng nhập văn bản để tiếp tục."
+            intent_response = intent.IntentResponse(language=user_input.language)
+            intent_response.async_set_speech(response_text)
+            intent_response.async_set_card(
+                title="VBot Assist",
+                content=response_text
+            )
+            return conversation.ConversationResult(
+                response=intent_response,
+                conversation_id=user_input.conversation_id
+            )
         mode_entity_id = f"select.assist_tac_nhan_che_do_xu_ly_{self.device_id.lower()}"
         stream_entity_id = f"select.assist_tac_nhan_luong_xu_ly_{self.device_id.lower()}"
-
         mode_state = self.hass.states.get(mode_entity_id)
         processing_mode = mode_state.state if mode_state else "chatbot"
-
         stream_state = self.hass.states.get(stream_entity_id)
         processing_stream = stream_state.state if stream_state else "mqtt"
-
-        # 🔍 Chuẩn hóa lại chế độ xử lý: "chatbot" / "processing"
         vbot_mode = "chatbot" if "chatbot" in processing_mode else "processing"
         intent_response = intent.IntentResponse(language=user_input.language)
-
         try:
-            if processing_stream == "mqtt":
-                # 📡 Gửi qua MQTT
-                topic = f"{self.device_id}/script/main_{processing_mode}/set"
-                await mqtt.async_publish(self.hass, topic, message, qos=1, retain=False)
-                _LOGGER.info(f"[VBot] Gửi MQTT tới {topic}: {message}")
-                response_text = f"Đã gửi lệnh qua MQTT - chế độ: {processing_mode}."
-
             #Nếu chọn Luồng API
-            elif processing_stream == "api":
+            if processing_stream == "api":
                 url = f"http://{self.base_url}/"
                 payload = {
                     "type": 3,
@@ -65,7 +65,11 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                             error_body = await resp.text()
                             _LOGGER.error(f"[VBot Assist] Không thể lấy phản hồi từ API: {error_body}")
                             response_text = "Lỗi khi lấy dữ liệu phản hồi"
-
+            #Luồng MQTT
+            elif processing_stream == "mqtt":
+                topic = f"{self.device_id}/script/main_{processing_mode}/set"
+                await mqtt.async_publish(self.hass, topic, message, qos=1, retain=False)
+                response_text = f"Đã gửi lệnh tới VBot Qua MQTT"
             else:
                 raise ValueError(f"Luồng xử lý không hợp lệ: {processing_stream}")
 
@@ -79,8 +83,6 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
             title="VBot Assist",
             content=response_text
         )
-
-
         return conversation.ConversationResult(
             response=intent_response,
             conversation_id=user_input.conversation_id

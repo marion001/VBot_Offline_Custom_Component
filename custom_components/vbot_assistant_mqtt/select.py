@@ -131,7 +131,8 @@ class ProcessingStreamSelect(SelectEntity):
         self._device = device
         self._attr_name = f"Assist Tác Nhân Luồng Xử Lý ({device})"
         self._attr_unique_id = f"{device.lower()}_assist_stream_select"
-        self._attr_options = ["api", "mqtt"]
+        #self._attr_options = ["api", "mqtt"]
+        self._attr_options = ["api"]
         self._attr_icon = "mdi:transfer-right"
         self._attr_current_option = "api"  # hoặc bạn chọn mặc định là "api"
 
