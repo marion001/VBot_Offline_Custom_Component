@@ -332,19 +332,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:assistant"
           },
           {
-            "name": f"Display Screen Active ({device})",
-            "state_topic": f"{device}/switch/display_screen_active/state",
-            "command_topic": f"{device}/switch/display_screen_active/set",
-            "payload_on": "ON",
-            "payload_off": "OFF",
-            "state_on": "ON",
-            "state_off": "OFF",
-            "optimistic": False,
-            "qos": 1,
-            "retain": True,
-            "icon": "mdi:monitor-shimmer"
-          },
-          {
             "name": f"Multiple Command Active ({device})",
             "state_topic": f"{device}/switch/multiple_command_active/state",
             "command_topic": f"{device}/switch/multiple_command_active/set",
