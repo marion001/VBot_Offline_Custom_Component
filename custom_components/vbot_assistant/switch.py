@@ -371,6 +371,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:assistant"
           },
           {
+            "name": f"XiaoZhi AI Active ({device})",
+            "state_topic": f"{device}/switch/xiaozhi_active/state",
+            "command_topic": f"{device}/switch/xiaozhi_active/set",
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "state_on": "ON",
+            "state_off": "OFF",
+            "optimistic": False,
+            "qos": 1,
+            "retain": True,
+            "icon": "mdi:assistant"
+          },
+          {
             "name": f"DEV Custom Assistant Active ({device})",
             "state_topic": f"{device}/switch/dev_custom_assistant_active/state",
             "command_topic": f"{device}/switch/dev_custom_assistant_active/set",
