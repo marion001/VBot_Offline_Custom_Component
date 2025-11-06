@@ -119,6 +119,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:robot-confused-outline",
             "topic": f"{device}/script/vbot_tts/set",
             "template_input": f"text.vbot_tts_text_{device.lower()}"
+        },
+        {
+            "id": f"{device}_restart_vbot",
+            "name": f"Restart VBot Button ({device})",
+            "icon": "mdi:restart",
+            "topic": f"{device}/script/power_action/set",
+            "payload": "RESTART_VBOT_SERVICE"
+        },
+        {
+            "id": f"{device}_stop_vbot",
+            "name": f"Stop VBot Button ({device})",
+            "icon": "mdi:power-off",
+            "topic": f"{device}/script/power_action/set",
+            "payload": "STOP_VBOT_SERRVICE"
+        },
+        {
+            "id": f"{device}_reboot_system_os",
+            "name": f"Reboot SYSTEM OS Button ({device})",
+            "icon": "mdi:power-settings",
+            "topic": f"{device}/script/power_action/set",
+            "payload": "REBOOT_OS"
         }
     ]
 
