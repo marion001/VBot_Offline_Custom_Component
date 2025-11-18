@@ -396,6 +396,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "retain": True,
             "icon": "mdi:assistant"
           },
+          {
+            "name": f"NhacCuaTui Active ({device})",
+            "state_topic": f"{device}/switch/nhaccuatui_active/state",
+            "command_topic": f"{device}/switch/nhaccuatui_active/set",
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "state_on": "ON",
+            "state_off": "OFF",
+            "optimistic": False,
+            "qos": 1,
+            "retain": True,
+            "icon": "mdi:music-circle"
+          },
     ]
     ents = [MQTTSwitch(hass, device=device, **s) for s in switches]
     async_add_entities(ents, update_before_add=True)
