@@ -10,7 +10,7 @@ Trang Chính VBot Assistant: https://github.com/marion001/VBot_Offline
 ## Cài Đặt
 0. Yêu Cầu: Trong Cấu Hình Config Của Loa VBot Phải Bật -> Cấu Hình Kết Nối MQTT Broker Nhé
 1. Cài đặt [bằng cách đăng ký làm kho lưu trữ tùy chỉnh của HACS thêm trực tiếp url]
-     - đi tới HACS -> Kho lưu trữ tùy chỉnh ->Thêm URL: [https://github.com/marion001/VBot-Assist-Conversation.git](https://github.com/marion001/VBot-Assistant-MQTT-HASS.git) -> chọn Kiểu là: "Bộ Tích Hợp" -> nhấn "Thêm"
+     - đi tới HACS -> Kho lưu trữ tùy chỉnh ->Thêm URL: [https://github.com/marion001/VBot_Offline_Custom_Component](https://github.com/marion001/VBot_Offline_Custom_Component) -> chọn Kiểu là: "Bộ Tích Hợp" -> nhấn "Thêm"
 
 2. Sau khi thêm URL xong bạn hãy tìm kiếm từ khóa: "VBot Assistant MQTT" trong HACS hãy tải xuống cài đặt nó
 3. Khởi động lại Home Assistant khi đã cài đặt xong "VBot Assistant MQTT"
