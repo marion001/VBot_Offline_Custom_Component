@@ -17,6 +17,126 @@ from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API
 
 _LOGGER = logging.getLogger(__name__)
 
+class MQTTSwitch(SwitchEntity):
+    def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain, icon=None, device=None):
+        self._hass = hass
+        self._name = name
+        self._device = device
+        self._attr_unique_id = f"{device.lower()}_{state_topic.replace('/', '_')}_switch"
+        self._attr_device_class = "switch"
+        self._attr_icon = icon or "mdi:dip-switch"
+        self._state_topic = state_topic
+        self._command_topic = command_topic
+        self._payload_on = payload_on
+        self._payload_off = payload_off
+        self._state_on = state_on
+        self._state_off = state_off
+        self._optimistic = optimistic
+        self._qos = qos
+        self._retain = retain
+        self._is_on = False
+
+    async def async_added_to_hass(self):
+        await mqtt.async_subscribe(self._hass, self._state_topic, self._message_received, self._qos)
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def is_on(self):
+        return self._is_on
+
+    @property
+    def device_info(self):
+        if not self._device:
+            return None
+        return {
+            "identifiers": {(DOMAIN, self._device)},
+            "name": f"{self._device} VBot Assistant",
+            "manufacturer": "Vũ Tuyển",
+            "model": "VBot Assistant MQTT"
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await mqtt.async_publish(self._hass, self._command_topic, self._payload_on, self._qos, self._retain)
+        if self._optimistic:
+            self._is_on = True
+            self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs):
+        await mqtt.async_publish(self._hass, self._command_topic, self._payload_off, self._qos, self._retain)
+        if self._optimistic:
+            self._is_on = False
+            self.async_write_ha_state()
+
+    async def _message_received(self, msg):
+        payload = msg.payload
+        _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
+        self._is_on = payload == self._state_on
+        self.async_write_ha_state()
+
+#Switch kiểm tra TẤT CẢ cập nhật VBot
+class VBotCheckAllUpdatesSwitch(SwitchEntity, RestoreEntity):
+    def __init__(self, hass, device):
+        self.hass = hass
+        self._device = device
+        self._attr_name = f"Tự động kiểm tra cập nhật VBot ({device})"
+        self._attr_unique_id = f"{device}_check_all_updates"
+        self._attr_icon = "mdi:progress-upload"
+        self._is_on = True
+        hass.data.setdefault(DOMAIN, {})
+        hass.data[DOMAIN].setdefault("update_tasks", {})
+
+    async def async_added_to_hass(self):
+        last_state = await self.async_get_last_state()
+        if last_state:
+            self._is_on = last_state.state == "on"
+        if self._is_on and "all_updates" not in self.hass.data[DOMAIN]["update_tasks"]:
+            schedule_update_task(self.hass, "all")
+
+    @property
+    def is_on(self):
+        return self._is_on
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._device)},
+            "name": f"VBot Assistant Updates {self._device}",
+            "manufacturer": "Vũ Tuyển",
+            "model": "VBot Assistant Custom Component"
+        }
+
+    @property
+    def extra_state_attributes(self):
+        """Hiển thị trạng thái cập nhật"""
+        tasks = self.hass.data[DOMAIN].get("update_tasks", {})
+        return {
+            "last_check": "N/A",
+            "auto_check_enabled": "all_updates" in tasks,
+            "next_check": "30 minutes"
+        }
+
+    async def async_turn_on(self, **kwargs):
+        self._is_on = True
+        self.async_write_ha_state()
+        if "all_updates" not in self.hass.data[DOMAIN]["update_tasks"]:
+            schedule_update_task(self.hass, "all")
+        await check_all_updates(self.hass, self._device)
+
+    async def async_check_updates_service(self, call):
+        await check_all_updates(self.hass, self._device)
+
+    async def async_turn_off(self, **kwargs):
+        self._is_on = False
+        self.async_write_ha_state()
+        tasks = self.hass.data[DOMAIN]["update_tasks"]
+        if "all_updates" in tasks:
+            handle = tasks.pop("all_updates")
+            if callable(handle):
+                handle()
+
 async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, discovery_info=None):
     _LOGGER.error("VBot Assistant MQTT không hỗ trợ cấu hình YAML. Vui lòng dùng UI (config_entry).")
     pass
@@ -428,65 +548,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ents.append(VBotCheckAllUpdatesSwitch(hass, device))
     async_add_entities(ents, update_before_add=True)
 
-class MQTTSwitch(SwitchEntity):
-    def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain, icon=None, device=None):
-        self._hass = hass
-        self._name = name
-        self._device = device
-        self._attr_unique_id = f"{device.lower()}_{state_topic.replace('/', '_')}_switch"
-        self._attr_device_class = "switch"
-        self._attr_icon = icon or "mdi:dip-switch"
-        self._state_topic = state_topic
-        self._command_topic = command_topic
-        self._payload_on = payload_on
-        self._payload_off = payload_off
-        self._state_on = state_on
-        self._state_off = state_off
-        self._optimistic = optimistic
-        self._qos = qos
-        self._retain = retain
-        self._is_on = False
-
-    async def async_added_to_hass(self):
-        await mqtt.async_subscribe(self._hass, self._state_topic, self._message_received, self._qos)
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def is_on(self):
-        return self._is_on
-
-    @property
-    def device_info(self):
-        if not self._device:
-            return None
-        return {
-            "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assistant",
-            "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT"
-        }
-
-    async def async_turn_on(self, **kwargs):
-        await mqtt.async_publish(self._hass, self._command_topic, self._payload_on, self._qos, self._retain)
-        if self._optimistic:
-            self._is_on = True
-            self.async_write_ha_state()
-
-    async def async_turn_off(self, **kwargs):
-        await mqtt.async_publish(self._hass, self._command_topic, self._payload_off, self._qos, self._retain)
-        if self._optimistic:
-            self._is_on = False
-            self.async_write_ha_state()
-
-    async def _message_received(self, msg):
-        payload = msg.payload
-        _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
-        self._is_on = payload == self._state_on
-        self.async_write_ha_state()
-
 #Lấy chỉ IP từ VBot URL config
 def get_vbot_ip(hass):
     try:
@@ -712,64 +773,3 @@ def schedule_update_task(hass, type_):
     handle = async_track_time_interval(hass, task, interval)
     hass.data[DOMAIN].setdefault("update_tasks", {})
     hass.data[DOMAIN]["update_tasks"]["all_updates"] = handle
-
-#Switch kiểm tra TẤT CẢ cập nhật VBot
-class VBotCheckAllUpdatesSwitch(SwitchEntity, RestoreEntity):
-    def __init__(self, hass, device):
-        self.hass = hass
-        self._device = device
-        self._attr_name = f"Tự động kiểm tra cập nhật VBot ({device})"
-        self._attr_unique_id = f"{device}_check_all_updates"
-        self._attr_icon = "mdi:progress-upload"
-        self._is_on = True
-        hass.data.setdefault(DOMAIN, {})
-        hass.data[DOMAIN].setdefault("update_tasks", {})
-
-    async def async_added_to_hass(self):
-        last_state = await self.async_get_last_state()
-        if last_state:
-            self._is_on = last_state.state == "on"
-        if self._is_on and "all_updates" not in self.hass.data[DOMAIN]["update_tasks"]:
-            schedule_update_task(self.hass, "all")
-
-    @property
-    def is_on(self):
-        return self._is_on
-
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._device)},
-            "name": f"VBot Assistant Updates {self._device}",
-            "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant Custom Component"
-        }
-
-    @property
-    def extra_state_attributes(self):
-        """Hiển thị trạng thái cập nhật"""
-        tasks = self.hass.data[DOMAIN].get("update_tasks", {})
-        return {
-            "last_check": "N/A",
-            "auto_check_enabled": "all_updates" in tasks,
-            "next_check": "30 minutes"
-        }
-
-    async def async_turn_on(self, **kwargs):
-        self._is_on = True
-        self.async_write_ha_state()
-        if "all_updates" not in self.hass.data[DOMAIN]["update_tasks"]:
-            schedule_update_task(self.hass, "all")
-        await check_all_updates(self.hass, self._device)
-
-    async def async_check_updates_service(self, call):
-        await check_all_updates(self.hass, self._device)
-
-    async def async_turn_off(self, **kwargs):
-        self._is_on = False
-        self.async_write_ha_state()
-        tasks = self.hass.data[DOMAIN]["update_tasks"]
-        if "all_updates" in tasks:
-            handle = tasks.pop("all_updates")
-            if callable(handle):
-                handle()
