@@ -695,7 +695,7 @@ async def check_update_collect(hass, update_type, vbot_ip, display_name, github_
 
 #Lên lịch kiểm tra cập nhật phiên bản VBot
 def schedule_update_task(hass, type_):
-    interval = timedelta(minutes=2)
+    interval = timedelta(hours=12)
     async def task(_now):
         try:
             await check_all_updates(hass)
