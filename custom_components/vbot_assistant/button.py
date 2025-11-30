@@ -148,6 +148,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:power-settings",
             "topic": f"{device}/script/power_action/set",
             "payload": "REBOOT_OS"
+        },
+        {
+            "id": f"{device}_check_updates",
+            "name": f"VBot Check Updates ({device})",
+            "icon": "mdi:update",
+            "command": "check_single_device_updates",
+            "device_id": device
         }
     ]
 
@@ -158,14 +165,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 hass=hass,
                 unique_id=btn["id"],
                 name=btn["name"],
-                topic=btn["topic"],
+                topic=btn.get("topic"),
                 payload=btn.get("payload"),
+                command=btn.get("command"),
+                device_id=btn.get("device_id"),
                 template_input=btn.get("template_input"),
                 icon=btn.get("icon", "mdi:gesture-tap-button"),
                 device=device
             )
         )
-
     async_add_entities(entities)
 
 class VBotMQTTButton(ButtonEntity):
@@ -174,8 +182,10 @@ class VBotMQTTButton(ButtonEntity):
         hass: HomeAssistant,
         unique_id: str,
         name: str,
-        topic: str,
+        topic: str | None = None,
         payload: str | None = None,
+        command: str | None = None,
+        device_id: str | None = None,
         template_input: str | None = None,
         icon: str = "mdi:gesture-tap-button",
         device: str | None = None
@@ -185,32 +195,37 @@ class VBotMQTTButton(ButtonEntity):
         self._attr_name = name
         self._topic = topic
         self._payload = payload
+        self._command = command
+        self._device_id = device_id
         self._template_input = template_input
         self._attr_icon = icon
         self._device = device
 
     async def async_press(self) -> None:
-        payload = self._payload
-        if self._template_input:
-            state_obj = self._hass.states.get(self._template_input)
-            if state_obj:
-                payload = state_obj.state
-            else:
-                _LOGGER.warning("Không tìm thấy dữ liệu đầu vào mẫu: '%s'", self._template_input)
+        #Xử lý MQTT command
+        if self._topic and self._payload:
+            payload = self._payload
+            if self._template_input:
+                state_obj = self._hass.states.get(self._template_input)
+                if state_obj:
+                    payload = state_obj.state
+                else:
+                    _LOGGER.warning("Không tìm thấy dữ liệu đầu vào mẫu: '%s'", self._template_input)
+                    return
+            if payload is None:
+                _LOGGER.warning("Không có nội dung nào để xuất bản cho nút: %s", self._attr_name)
                 return
-
-        if payload is None:
-            _LOGGER.warning("Không có nội dung nào để xuất bản cho nút: %s", self._attr_name)
-            return
-
-        _LOGGER.debug("Gửi tin nhắn MQTT tới %s: %s", self._topic, payload)
-        await mqtt.async_publish(
-            self._hass,
-            self._topic,
-            payload,
-            qos=1,
-            retain=True
-        )
+            #_LOGGER.debug("Gửi tin nhắn MQTT tới %s: %s", self._topic, payload)
+            await mqtt.async_publish(self._hass, self._topic, payload, qos=1, retain=True)
+        #Xử lý VBot Command
+        elif self._command == "check_single_device_updates" and self._device_id:
+            try:
+                from .switch import check_single_device_updates
+                await check_single_device_updates(self._hass, self._device_id)
+            except Exception as e:
+                _LOGGER.error(f"❌ [VBot Button] Lỗi khi kiểm tra cập nhật {self._device_id}: {e}")
+        else:
+            _LOGGER.warning(f"[VBot Button] Không có command hợp lệ cho nút: {self._attr_name}")
 
     @property
     def device_info(self):

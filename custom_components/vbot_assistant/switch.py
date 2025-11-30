@@ -123,7 +123,6 @@ class VBotCheckAllUpdatesSwitch(SwitchEntity, RestoreEntity):
 
     @property
     def extra_state_attributes(self):
-        """Hiển thị trạng thái cập nhật"""
         device_tasks = self.hass.data[DOMAIN].get("device_tasks", {})
         task = device_tasks.get(self._device_id)
         return {
