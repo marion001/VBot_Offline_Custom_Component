@@ -203,7 +203,8 @@ class VBotMQTTButton(ButtonEntity):
 
     async def async_press(self) -> None:
         #Xử lý MQTT command
-        if self._topic and self._payload:
+        #if self._topic and self._payload:
+        if self._topic:
             payload = self._payload
             if self._template_input:
                 state_obj = self._hass.states.get(self._template_input)
