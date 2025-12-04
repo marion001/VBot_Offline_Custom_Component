@@ -150,6 +150,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "payload": "REBOOT_OS"
         },
         {
+            "id": f"{device}_restart_interface",
+            "name": f"Restart Giao Diện VBot Button ({device})",
+            "icon": "mdi:restart",
+            "topic": f"{device}/script/power_action/set",
+            "payload": "RESTART_INTERFACE"
+        },
+        {
             "id": f"{device}_check_updates",
             "name": f"VBot Check Updates ({device})",
             "icon": "mdi:update",
