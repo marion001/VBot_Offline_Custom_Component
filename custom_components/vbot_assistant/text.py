@@ -46,6 +46,11 @@ async def async_setup_entry(
             "name": f"VBot TTS Text ({device})",
             "value": "Chào bạn, đây là nội dung để phát thông báo",
         }
+        {
+            "id": f"{device.lower()}_vbot_play_music_link_url",
+            "name": f"VBot Play Music Link URL ({device})",
+            "value": "https://zingmp3.vn/bai-hat/Thiep-Hong-Sai-Ten-Huong-Ly/Z8B9AFF0.html",
+        }
     ]
 
     entities = []

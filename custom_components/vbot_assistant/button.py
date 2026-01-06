@@ -52,6 +52,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "payload": "RESUME"
         },
         {
+            "id": f"{device}_media_control_play",
+            "name": f"Media Pause Button ({device})",
+            "icon": "mdi:pause-circle-outline",
+            "topic": f"{device}/script/media_control/set",
+            "payload": json.dumps({
+                "action": "play",
+                "media_link": f"text.vbot_play_music_link_url_{device.lower()}",
+                "media_name": "",
+                "media_cover": "",
+                "media_player_source": "MQTT"
+            })
+        },
+        {
             "id": f"{device}_volume_control_up",
             "name": f"Volume UP Button ({device})",
             "icon": "mdi:volume-plus",
