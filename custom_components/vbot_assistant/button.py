@@ -7,6 +7,7 @@ Mail: VBot.Assistant@gmail.com
 '''
 
 import logging
+import json
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components import mqtt
 from homeassistant.core import HomeAssistant
