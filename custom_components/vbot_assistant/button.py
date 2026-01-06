@@ -54,8 +54,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         },
         {
             "id": f"{device}_media_control_play",
-            "name": f"Media Pause Button ({device})",
-            "icon": "mdi:pause-circle-outline",
+            "name": f"Media Play Link URL Button ({device})",
+            "icon": "mdi:motion-play",
             "topic": f"{device}/script/media_control/set",
             "payload": json.dumps({
                 "action": "play",
