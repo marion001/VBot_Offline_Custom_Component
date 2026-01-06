@@ -57,13 +57,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "name": f"Media Play Link URL Button ({device})",
             "icon": "mdi:motion-play",
             "topic": f"{device}/script/media_control/set",
-            "payload": json.dumps({
-                "action": "play",
-                "media_link": f"text.vbot_play_music_link_url_{device.lower()}",
-                "media_name": "",
-                "media_cover": "",
-                "media_player_source": "MQTT"
-            })
+            "template_input": f"text.vbot_play_music_link_url_{device.lower()}",
+            "payload": "MEDIA_PLAY_DYNAMIC"
         },
         {
             "id": f"{device}_volume_control_up",
@@ -223,31 +218,23 @@ class VBotMQTTButton(ButtonEntity):
         self._device = device
 
     async def async_press(self) -> None:
-        #Xử lý MQTT command
-        #if self._topic and self._payload:
         if self._topic:
             payload = self._payload
             if self._template_input:
                 state_obj = self._hass.states.get(self._template_input)
-                if state_obj:
-                    payload = state_obj.state
-                else:
-                    _LOGGER.warning("Không tìm thấy dữ liệu đầu vào mẫu: '%s'", self._template_input)
+                if not state_obj:
+                    _LOGGER.warning("Không tìm thấy entity template_input: %s", self._template_input)
                     return
+                value = state_obj.state
+                #Nếu là media play → build JSON động
+                if self._payload == "MEDIA_PLAY_DYNAMIC":
+                    payload = json.dumps({"action": "play", "media_link": value, "media_name": "", "media_cover": "", "media_player_source": "MQTT"})
+                else:
+                    payload = value
             if payload is None:
-                _LOGGER.warning("Không có nội dung nào để xuất bản cho nút: %s", self._attr_name)
+                _LOGGER.warning("Không có payload cho nút: %s", self._attr_name)
                 return
-            #_LOGGER.debug("Gửi tin nhắn MQTT tới %s: %s", self._topic, payload)
             await mqtt.async_publish(self._hass, self._topic, payload, qos=1, retain=True)
-        #Xử lý VBot Command
-        elif self._command == "check_single_device_updates" and self._device_id:
-            try:
-                from .switch import check_single_device_updates
-                await check_single_device_updates(self._hass, self._device_id)
-            except Exception as e:
-                _LOGGER.error(f"❌ [VBot Button] Lỗi khi kiểm tra cập nhật {self._device_id}: {e}")
-        else:
-            _LOGGER.warning(f"[VBot Button] Không có command hợp lệ cho nút: {self._attr_name}")
 
     @property
     def device_info(self):
