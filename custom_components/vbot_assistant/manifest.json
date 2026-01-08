@@ -1,7 +1,7 @@
 {
   "domain": "vbot_assistant",
   "name": "VBot Assistant",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "documentation": "https://github.com/marion001/VBot-Assistant-MQTT-HASS",
   "issue_tracker": "https://github.com/marion001/VBot-Assistant-MQTT-HASS/issues",
   "requirements": ["aiohttp"],
