@@ -9,13 +9,7 @@ Mail: VBot.Assistant@gmail.com
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.components import conversation
-
-from .const import (
-    DOMAIN,
-    CONF_DEVICE_ID,
-    VBot_URL_API,
-)
-
+from .const import (DOMAIN, CONF_DEVICE_ID, VBot_URL_API)
 from .conversation_agent import VBotConversationAgent
 
 #Hàm khởi tạo chung, không làm gì nếu không dùng YAML
@@ -31,7 +25,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     if device_id:
         agent = VBotConversationAgent(hass, entry, device_id)
         conversation.async_set_agent(hass, entry, agent)
-
     await hass.config_entries.async_forward_entry_setups(
         entry,
         ["switch", "number", "sensor", "select", "button", "text", "media_player"]
@@ -47,3 +40,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEn
     hass.data[DOMAIN].pop(entry.entry_id, None)
     conversation.async_unset_agent(hass, entry)
     return True
+

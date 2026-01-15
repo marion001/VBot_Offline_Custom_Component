@@ -1,27 +1,39 @@
 {
     "title": "VBot Assistant",
     "config": {
+        "flow_title": "{name}",
+        "abort": {
+            "discovered": "Đã phát hiện thiết bị VBot trong mạng. Bạn có thể thêm thiết bị từ trang Tích hợp.",
+            "already_configured": "Thiết bị này đã được cấu hình trong Home Assistant."
+        },
         "step": {
             "user": {
-                "title": "Liên Kết VBot Assistant",
-                "description": "Nhập Tên Client tương ứng trong (Cấu Hình Config -> Cấu Hình Kết Nối MQTT Broker) của loa VBot",
+                "title": "Liên kết VBot Assistant",
+                "description": "Nhập Tên Client MQTT đã được cấu hình trên loa VBot",
                 "data": {
-                    "device_id": "Tên Client MQTT Của Loa VBot",
-                    "vbot_url_api": "Nhập IP:PORT Của API VBot",
-                    "vbot_processing_mode": "Chọn Luồng Xử Lý Dữ Liệu Tác Nhân Assist"
+                    "device_id": "Tên Client MQTT của loa VBot",
+                    "vbot_url_api": "Địa chỉ API VBot (IP:PORT)",
+                    "vbot_processing_mode": "Chọn luồng xử lý dữ liệu của trợ lý Assist"
                 }
             },
             "init": {
-                "title": "Cấu Hình Lại VBot Assistant",
-                "description": "Thay đổi thông số API hoặc chế độ xử lý cho tác nhân trợ lý VBot",
+                "title": "Cấu hình lại VBot Assistant",
+                "description": "Thay đổi thông tin API hoặc chế độ xử lý cho trợ lý VBot",
                 "data": {
-                    "vbot_url_api": "Nhập IP:PORT Của API VBot",
-                    "vbot_processing_mode": "Chọn Luồng Xử Lý Dữ Liệu Tác Nhân Assist"
+                    "vbot_url_api": "Địa chỉ API VBot (IP:PORT)",
+                    "vbot_processing_mode": "Chọn luồng xử lý dữ liệu của trợ lý Assist"
                 }
+            },
+            "confirm": {
+                "title": "Tìm thấy thiết bị VBot ({name})",
+                "description": "- Tên Thiết Bị: **{name}**\n- Tên Client MQTT: **{device}**\n - Địa chỉ IP:API: **{host}**\n- Phiên Bản Chương Trình: **{version}**\n\nBạn có muốn thêm thiết bị này vào Home Assistant không?"
             }
         },
         "error": {
-            "device_exists": "Tên Client của thiết bị này đã được liên kết và tồn tại trong Home Assistant, Vui lòng thay đổi Tên Client khác và nhập lại"
+            "device_exists": "Thiết bị này đã được thêm vào Home Assistant.",
+			"no_discovery_data": "Không tìm thấy dữ liệu thiết bị mDNS.",
+			"invalid_discovery_data": "Dữ liệu thiết bị mDNS không hợp lệ.",
+			"discovery_pending": "Thiết bị này đang chờ xác nhận từ phát hiện tự động (mDNS). Bạn có thể chờ hoặc thêm thủ công với thông tin khác."
         }
     }
 }
