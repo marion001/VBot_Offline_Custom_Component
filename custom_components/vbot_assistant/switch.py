@@ -611,6 +611,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "retain": True,
             "icon": "mdi:music-circle"
           },
+          {
+            "name": f"Phát Lặp Lại Danh Sách Nhạc ({device})",
+            "state_topic": f"{device}/switch/playlist_loop/state",
+            "command_topic": f"{device}/switch/playlist_loop/set",
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "state_on": "ON",
+            "state_off": "OFF",
+            "optimistic": False,
+            "qos": 1,
+            "retain": True,
+            "icon": "mdi:repeat-variant"
+          },
     ]
     ents = [MQTTSwitch(hass, device=device, **s) for s in switches]
     hass.data[DOMAIN][VBot_URL_API] = vbot_url
