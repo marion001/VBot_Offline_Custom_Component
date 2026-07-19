@@ -112,7 +112,7 @@ class ProcessingModeSelect(SelectEntity):
         self._attr_options = ["chatbot", "processing"]
         self._attr_icon = "mdi:robot"
         self._attr_current_option = "chatbot"
-        self._attr_entity_id = f"select.assist_processing_mode_select_{device.lower()}"
+        self._attr_entity_id = f"select.assist_tac_nhan_che_do_xu_ly_{device.lower()}"
     @property
     def current_option(self):
         return self._attr_current_option
@@ -141,6 +141,7 @@ class ProcessingStreamSelect(SelectEntity):
         self._attr_icon = "mdi:transfer-right"
         #Mặc Định chọn API
         self._attr_current_option = "api"
+        self._attr_entity_id = f"select.assist_tac_nhan_luong_xu_ly_{device.lower()}"
 
     @property
     def current_option(self):

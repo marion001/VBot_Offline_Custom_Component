@@ -121,7 +121,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "name": f"News Paper Player Button ({device})",
             "icon": "mdi:podcast",
             "topic": f"{device}/script/news_paper/set",
-            "template_input": f"text.{device.lower()}_news_paper_name"
+            "template_input": f"text.news_paper_name_text_{device.lower()}"
         },
         {
             "id": f"{device}_main_processing",
@@ -223,6 +223,22 @@ class VBotMQTTButton(ButtonEntity):
             if self._template_input:
                 state_obj = self._hass.states.get(self._template_input)
                 if not state_obj:
+                    # Entity ID có thể đã được đổi trong giao diện HASS hoặc
+                    # được tạo từ tên hiển thị thay vì unique_id.
+                    candidates = (
+                        f"text.vbot_tts_text_{self._device.lower()}"
+                        if self._device and "vbot_tts" in (self._template_input or "")
+                        else None,
+                        f"text.news_paper_name_text_{self._device.lower()}"
+                        if self._device and "news_paper" in (self._template_input or "")
+                        else None,
+                    )
+                    for candidate in candidates:
+                        if candidate:
+                            state_obj = self._hass.states.get(candidate)
+                            if state_obj:
+                                break
+                if not state_obj:
                     _LOGGER.warning("Không tìm thấy entity template_input: %s", self._template_input)
                     return
                 value = state_obj.state
@@ -234,7 +250,9 @@ class VBotMQTTButton(ButtonEntity):
             if payload is None:
                 _LOGGER.warning("Không có payload cho nút: %s", self._attr_name)
                 return
-            await mqtt.async_publish(self._hass, self._topic, payload, qos=1, retain=True)
+            # Command topics must not be retained: a reconnecting VBot must
+            # never replay an old play/stop/power command.
+            await mqtt.async_publish(self._hass, self._topic, payload, qos=1, retain=False)
 
     @property
     def device_info(self):

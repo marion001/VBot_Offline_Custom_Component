@@ -7,10 +7,12 @@ Mail: VBot.Assistant@gmail.com
 '''
 
 import logging
+import asyncio
 import aiohttp
-from homeassistant.components import mqtt
 from homeassistant.components import conversation
 from homeassistant.helpers import intent
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from .const import VBot_URL_API, normalize_vbot_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +21,9 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
         self.hass = hass
         self.entry = entry
         self.device_id = device_id
-        self.base_url = entry.data.get("vbot_url_api")
+        self.base_url = normalize_vbot_url(
+            entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API))
+        )
 
     @property
     def supported_languages(self) -> list[str]:
@@ -45,13 +49,15 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
         mode_state = self.hass.states.get(mode_entity_id)
         processing_mode = mode_state.state if mode_state else "chatbot"
         stream_state = self.hass.states.get(stream_entity_id)
-        processing_stream = stream_state.state if stream_state else "mqtt"
+        processing_stream = stream_state.state if stream_state else "api"
         vbot_mode = "chatbot" if "chatbot" in processing_mode else "processing"
         intent_response = intent.IntentResponse(language=user_input.language)
         try:
             #Nếu chọn Luồng API
             if processing_stream == "api":
-                url = f"http://{self.base_url}/"
+                if not self.base_url:
+                    raise ValueError("Chưa cấu hình URL API VBot")
+                url = f"{self.base_url}/"
                 payload = {
                     "type": 3,
                     "data": "main_processing",
@@ -61,8 +67,9 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                 headers = {
                     "Content-Type": "application/json"
                 }
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json=payload, headers=headers) as resp:
+                timeout = aiohttp.ClientTimeout(total=15)
+                session = async_get_clientsession(self.hass)
+                async with session.post(url, json=payload, headers=headers, timeout=timeout) as resp:
                         if resp.status == 200:
                             data = await resp.json()
                             if data.get("success") and "message" in data:
@@ -74,17 +81,17 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                             error_body = await resp.text()
                             _LOGGER.error(f"[VBot Assist] Không thể lấy phản hồi từ API: {error_body}")
                             response_text = "Lỗi khi lấy dữ liệu phản hồi"
-            #Luồng MQTT (Đang Vô Hiệu)
-            elif processing_stream == "mqtt":
-                topic = f"{self.device_id}/script/main_{processing_mode}/set"
-                await mqtt.async_publish(self.hass, topic, message, qos=1, retain=False)
-                response_text = f"Đã gửi lệnh tới VBot Qua MQTT"
             else:
                 raise ValueError(f"Luồng xử lý không hợp lệ: {processing_stream}")
 
-        except Exception as e:
+        except asyncio.TimeoutError:
+            response_text = "VBot chưa phản hồi, vui lòng thử lại."
+        except (aiohttp.ClientError, ValueError) as e:
             _LOGGER.error(f"[VBot Assist] Lỗi khi gửi lệnh: {e}")
             response_text = "Không thể gửi lệnh tới thiết bị."
+        except Exception as e:
+            _LOGGER.exception("[VBot Assist] Lỗi xử lý phản hồi ngoài dự kiến: %s", e)
+            response_text = "VBot trả về dữ liệu không hợp lệ."
 
         #Trả lại kết quả cho Assist
         intent_response.async_set_speech(response_text)

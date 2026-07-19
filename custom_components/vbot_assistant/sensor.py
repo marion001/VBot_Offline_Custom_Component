@@ -7,6 +7,7 @@ Mail: VBot.Assistant@gmail.com
 '''
 
 import logging
+import json
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
@@ -49,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
 
     entities = [MQTTSensor(hass, device=device, **s) for s in sensors]
+    entities.append(VBotTTSStateSensor(hass, device))
     async_add_entities(entities, update_before_add=True)
 
 class MQTTSensor(SensorEntity):
@@ -93,3 +95,35 @@ class MQTTSensor(SensorEntity):
             "manufacturer": "Vũ Tuyển",
             "model": "VBot Assistant MQTT"
         }
+
+
+class VBotTTSStateSensor(MQTTSensor):
+    def __init__(self, hass, device):
+        super().__init__(
+            hass,
+            name=f"Trạng Thái TTS ({device})",
+            state_topic=f"{device}/tts/state",
+            icon="mdi:text-to-speech",
+            device=device,
+        )
+        self._attributes = {}
+
+    async def _message_received(self, msg):
+        try:
+            data = json.loads(msg.payload)
+            if not isinstance(data, dict):
+                raise ValueError("payload không phải object")
+            self._state = str(data.get("state", "unknown"))
+            self._attributes = {
+                "text": data.get("text"),
+                "source": data.get("source"),
+                "error": data.get("error"),
+                "updated_at": data.get("updated_at"),
+            }
+            self.async_write_ha_state()
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            _LOGGER.warning("Trạng thái TTS VBot không hợp lệ: %s", error)
+
+    @property
+    def extra_state_attributes(self):
+        return self._attributes

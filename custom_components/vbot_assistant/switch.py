@@ -21,7 +21,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.event import async_call_later
-from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API
+from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, normalize_vbot_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -179,7 +179,9 @@ async def check_single_device_updates(hass, device_id):
         if not target_entry:
             _LOGGER.warning(f"⚠️ [VBot] Không tìm thấy entry cho {device_id}")
             return
-        vbot_url = target_entry.data.get(VBot_URL_API, "")
+        vbot_url = normalize_vbot_url(target_entry.options.get(
+            VBot_URL_API, target_entry.data.get(VBot_URL_API, "")
+        ))
         hass.data[DOMAIN][VBot_URL_API] = vbot_url
         vbot_ip = get_vbot_ip(hass)
         if not vbot_ip:

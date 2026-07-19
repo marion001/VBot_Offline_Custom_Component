@@ -8,6 +8,7 @@ Mail: VBot.Assistant@gmail.com
 
 import logging
 import json
+from datetime import datetime, timezone
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -15,6 +16,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.components import mqtt
 from homeassistant.core import HomeAssistant
+from homeassistant.core import callback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN, CONF_DEVICE_ID
@@ -45,9 +47,109 @@ class VBotMediaPlayer(MediaPlayerEntity):
             | MediaPlayerEntityFeature.PAUSE
             | MediaPlayerEntityFeature.STOP
             | MediaPlayerEntityFeature.PLAY_MEDIA
+            | MediaPlayerEntityFeature.VOLUME_SET
+            | MediaPlayerEntityFeature.VOLUME_MUTE
+            | MediaPlayerEntityFeature.SEEK
+            | MediaPlayerEntityFeature.NEXT_TRACK
+            | MediaPlayerEntityFeature.PREVIOUS_TRACK
         )
         self._media_title = None
         self._media_url = None
+        self._attr_available = False
+        self._attr_source = None
+        self._attr_media_artist = None
+        self._attr_media_album_name = None
+        self._attr_media_duration = None
+        self._attr_media_position = None
+        self._attr_media_position_updated_at = None
+        self._attr_media_image_url = None
+        self._attr_volume_level = None
+        self._source_kind = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        unsubscribe = await mqtt.async_subscribe(
+            self._hass,
+            f"{self._device}/media_player/state",
+            self._handle_state_message,
+            qos=1,
+        )
+        self.async_on_remove(unsubscribe)
+        unsubscribe_availability = await mqtt.async_subscribe(
+            self._hass,
+            f"{self._device}/availability",
+            self._handle_availability_message,
+            qos=1,
+        )
+        self.async_on_remove(unsubscribe_availability)
+
+    @callback
+    def _handle_availability_message(self, message) -> None:
+        self._attr_available = str(message.payload).strip().lower() == "online"
+        self.async_write_ha_state()
+
+    @callback
+    def _handle_state_message(self, message) -> None:
+        try:
+            payload = json.loads(message.payload)
+            if not isinstance(payload, dict):
+                raise ValueError("payload không phải object")
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            _LOGGER.warning("Snapshot Media Player VBot không hợp lệ: %s", error)
+            return
+
+        state = str(payload.get("state", "idle")).lower()
+        if state == "unavailable":
+            self._attr_available = False
+            self.async_write_ha_state()
+            return
+
+        state_mapping = {
+            "playing": MediaPlayerState.PLAYING,
+            "paused": MediaPlayerState.PAUSED,
+            "idle": MediaPlayerState.IDLE,
+        }
+        self._attr_available = True
+        self._attr_state = state_mapping.get(state, MediaPlayerState.IDLE)
+        self._media_title = payload.get("title")
+        self._attr_media_artist = payload.get("artist")
+        self._attr_media_album_name = payload.get("album")
+        self._media_url = payload.get("media_url")
+        self._attr_media_image_url = payload.get("cover")
+        self._attr_source = payload.get("source")
+        self._source_kind = payload.get("source_kind")
+        self._playlist_active = bool(payload.get("playlist_active"))
+        self._playlist_index = payload.get("playlist_index")
+        self._playlist_total = payload.get("playlist_total", 0)
+        self._playlist_loop = bool(payload.get("playlist_loop"))
+        self._attr_media_duration = self._number_or_none(payload.get("duration"))
+        self._attr_media_position = self._number_or_none(payload.get("position"))
+        volume = self._number_or_none(payload.get("volume"))
+        self._attr_volume_level = None if volume is None else max(0.0, min(1.0, volume / 100.0))
+        if self._attr_media_position is not None:
+            self._attr_media_position_updated_at = datetime.now(timezone.utc)
+        else:
+            self._attr_media_position_updated_at = None
+        self.async_write_ha_state()
+
+    @staticmethod
+    def _number_or_none(value):
+        if isinstance(value, str) and ":" in value:
+            try:
+                parts = [int(part) for part in value.split(":")]
+                if len(parts) == 3:
+                    return float(parts[0] * 3600 + parts[1] * 60 + parts[2])
+                if len(parts) == 2:
+                    return float(parts[0] * 60 + parts[1])
+            except ValueError:
+                return None
+        try:
+            number = float(value) if value is not None else None
+            if number is not None and number > 10000:
+                number /= 1000.0
+            return number
+        except (TypeError, ValueError):
+            return None
 
     @property
     def state(self):
@@ -118,6 +220,55 @@ class VBotMediaPlayer(MediaPlayerEntity):
             retain=False
         )
         self.async_write_ha_state()
+
+    async def async_set_volume_level(self, volume: float) -> None:
+        value = round(max(0.0, min(1.0, volume)) * 100)
+        await mqtt.async_publish(
+            self._hass,
+            f"{self._device}/number/volume/set",
+            str(value),
+            qos=1,
+            retain=False,
+        )
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        await mqtt.async_publish(
+            self._hass,
+            f"{self._device}/script/volume_control/set",
+            "mute" if mute else "unmute",
+            qos=1,
+            retain=False,
+        )
+
+    async def async_media_seek(self, position: float) -> None:
+        payload = json.dumps({"action": "seek", "set_duration": max(0, round(position))})
+        await mqtt.async_publish(
+            self._hass, f"{self._device}/script/media_control/set",
+            payload, qos=1, retain=False
+        )
+
+    async def async_media_next_track(self) -> None:
+        await mqtt.async_publish(
+            self._hass, f"{self._device}/script/playlist_control/set",
+            "next", qos=1, retain=False
+        )
+
+    async def async_media_previous_track(self) -> None:
+        await mqtt.async_publish(
+            self._hass, f"{self._device}/script/playlist_control/set",
+            "prev", qos=1, retain=False
+        )
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "source_kind": self._source_kind,
+            "media_url": self._media_url,
+            "playlist_active": getattr(self, "_playlist_active", False),
+            "playlist_index": getattr(self, "_playlist_index", None),
+            "playlist_total": getattr(self, "_playlist_total", 0),
+            "playlist_loop": getattr(self, "_playlist_loop", False),
+        }
 
     @property
     def device_info(self):
