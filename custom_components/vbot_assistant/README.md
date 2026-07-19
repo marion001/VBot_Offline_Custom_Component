@@ -9,6 +9,3 @@ Tài liệu sử dụng đầy đủ của integration được duy trì tại
 - Conversation Agent với chế độ `chatbot` và `processing`;
 - ví dụ Lovelace, script và automation;
 - MQTT topics và hướng dẫn xử lý sự cố.
-
-Giữ tài liệu tại một nguồn duy nhất giúp README không bị lệch với phiên bản
-component hiện tại.
