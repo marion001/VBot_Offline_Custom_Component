@@ -79,6 +79,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._attr_media_image_url = None
         self._attr_volume_level = None
         self._source_kind = None
+        self._is_host_device = use_host_default_cover
         self._default_cover_url = (
             self._build_host_default_cover_url(api_url)
             if use_host_default_cover else None
@@ -246,12 +247,20 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_media_play(self):
-        #_LOGGER.info("Tiếp tục phát media")
+        # Nếu loa chủ đang rảnh thì không có phiên media để tiếp tục;
+        # lúc này nút Play sẽ phát playlist mặc định.
+        if self._is_host_device and self._attr_state == MediaPlayerState.IDLE:
+            topic = f"{self._device}/script/playlist_control/set"
+            payload = "PLAY"
+        else:
+            topic = f"{self._device}/script/media_control/set"
+            payload = "RESUME"
+
         self._attr_state = MediaPlayerState.PLAYING
         await mqtt.async_publish(
             self._hass,
-            f"{self._device}/script/media_control/set",
-            "RESUME",
+            topic,
+            payload,
             qos=1,
             retain=False
         )
