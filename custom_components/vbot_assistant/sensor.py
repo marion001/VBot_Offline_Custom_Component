@@ -12,7 +12,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from .const import DOMAIN, CONF_DEVICE_ID
+from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +49,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         },
     ]
 
+    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+        sensor_specs = [
+            ("Thiết Bị Bluetooth Đang Kết Nối", "bluetooth_device_name", "mdi:bluetooth-audio"),
+            ("Phiên Bản", "version", "mdi:tag"),
+            ("Tên Ứng Dụng", "application_name", "mdi:application"),
+            ("App", "app", "mdi:apps"),
+            ("Tên App Package", "package_name", "mdi:package-variant"),
+            ("Thời Gian Khởi Động", "started_at", "mdi:clock-start"),
+            ("Tên WiFi", "wifi_name", "mdi:wifi"),
+            ("Địa Chỉ IP", "ip_address", "mdi:ip-network"),
+            ("Lựa Chọn Máy Chủ Kết Nối", "server_source", "mdi:server-network"),
+            ("Tên Client", "client_name", "mdi:speaker"),
+            ("Tên Client MQTT", "mqtt_client_name", "mdi:message-processing"),
+            ("Trạng Thái Kết Nối Máy Chủ", "server_connection", "mdi:server-network"),
+            ("Trạng Thái Loa", "speaker_status", "mdi:speaker-message"),
+            ("Chế Độ Đánh Thức", "wakeword_mode", "mdi:account-voice"),
+            ("Chế Độ Phát Playlist", "playlist_order", "mdi:playlist-music"),
+            ("Trạng Thái mDNS", "mdns_status", "mdi:lan-connect"),
+            ("Nguồn Phát Thực Tế", "playback_source", "mdi:audio-input-stereo-minijack"),
+            ("Trạng Thái Kết Nối Bluetooth", "bluetooth_connection", "mdi:bluetooth-connect"),
+        ]
+        sensors = [
+            {
+                "name": f"{label} ({device})",
+                "state_topic": f"{device}/sensor/{topic}/state",
+                "icon": icon,
+            }
+            for label, topic, icon in sensor_specs
+        ]
     entities = [MQTTSensor(hass, device=device, **s) for s in sensors]
     entities.append(VBotTTSStateSensor(hass, device))
     async_add_entities(entities, update_before_add=True)
@@ -64,12 +93,13 @@ class MQTTSensor(SensorEntity):
         self._state = None
 
     async def async_added_to_hass(self):
-        await mqtt.async_subscribe(
+        unsubscribe = await mqtt.async_subscribe(
             self._hass,
             self._state_topic,
             self._message_received,
             qos=1
         )
+        self.async_on_remove(unsubscribe)
 
     async def _message_received(self, msg):
         payload = msg.payload

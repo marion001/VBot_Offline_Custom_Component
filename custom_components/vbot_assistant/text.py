@@ -11,7 +11,7 @@ from homeassistant.components.text import TextEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from .const import DOMAIN, CONF_DEVICE_ID
+from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +53,11 @@ async def async_setup_entry(
         }
     ]
 
+    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+        inputs_config = [
+            item for item in inputs_config
+            if item["id"].endswith("_vbot_tts") or item["id"].endswith("_vbot_play_music_link_url")
+        ]
     entities = []
     for inp in inputs_config:
         entities.append(

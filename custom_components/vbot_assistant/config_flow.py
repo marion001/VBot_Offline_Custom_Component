@@ -9,7 +9,10 @@ Mail: VBot.Assistant@gmail.com
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components import persistent_notification
-from .const import (DOMAIN, CONF_DEVICE_ID, VBot_URL_API)
+from .const import (
+    DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE,
+    DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID,
+)
 #import logging
 #_LOGGER = logging.getLogger(__name__)
 
@@ -52,12 +55,21 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         url_api = properties.get("url_api", "").strip()
         device_name = (properties.get("name") or "VBot Assistant").strip()
         device_version = (properties.get("version") or "N/A").strip()
+        device_type = (properties.get(CONF_DEVICE_TYPE) or DEVICE_TYPE_HOST).strip()
+        if device_type not in (DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID):
+            device_type = DEVICE_TYPE_HOST
         if not device_id or not url_api:
             return self.async_abort(reason="invalid_discovery_data")
-        self._discovered_device = {CONF_DEVICE_ID: device_id, VBot_URL_API: url_api, "name": device_name, "version": device_version,}
+        self._discovered_device = {
+            CONF_DEVICE_ID: device_id,
+            VBot_URL_API: url_api,
+            CONF_DEVICE_TYPE: device_type,
+            "name": device_name,
+            "version": device_version,
+        }
         #Nếu muốn giữ cơ chế abort khi trùng (để chỉ có 1 nút)
         await self.async_set_unique_id(device_id)
-        self._abort_if_unique_id_configured()
+        self._abort_if_unique_id_configured(updates=self._discovered_device)
 
         self.context["title_placeholders"] = {"name": device_name,}
         persistent_notification.async_create(

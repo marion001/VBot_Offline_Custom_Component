@@ -12,7 +12,7 @@ from homeassistant.components.number import NumberEntity
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from .const import DOMAIN, CONF_DEVICE_ID
+from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +36,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:volume-source",
             "qos": 1,
         },
-        {
+    ]
+    if entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID:
+        numbers.append({
             "name": f"Độ Sáng Đèn Led Slide ({device})",
             "state_topic": f"{device}/number/led_brightness/state",
             "command_topic": f"{device}/number/led_brightness/set",
@@ -45,8 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "unit_of_measurement": None,
             "icon": "mdi:brightness-5",
             "qos": 1,
-        },
-    ]
+        })
     ents = [MQTTNumber(hass, device=device, **n) for n in numbers]
     async_add_entities(ents, update_before_add=True)
 
@@ -69,12 +70,13 @@ class MQTTNumber(NumberEntity):
         self._attr_native_unit_of_measurement = unit_of_measurement
 
     async def async_added_to_hass(self):
-        await mqtt.async_subscribe(
+        unsubscribe = await mqtt.async_subscribe(
             self._hass,
             self._state_topic,
             self._message_received,
             self._qos
         )
+        self.async_on_remove(unsubscribe)
 
     @property
     def name(self):

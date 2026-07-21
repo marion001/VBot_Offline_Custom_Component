@@ -1,0 +1,19 @@
+say:
+  name: Phát TTS trên VBot
+  description: Gửi nội dung TTS đến loa VBot hoặc Android Client qua MQTT.
+  fields:
+    device_id:
+      name: Tên Client MQTT
+      description: Tên Client MQTT của loa nhận nội dung.
+      required: true
+      example: VBot_Client_R1
+      selector:
+        text:
+    message:
+      name: Nội dung
+      description: Văn bản cần phát trên loa.
+      required: true
+      example: Xin chào, đây là loa Phicomm R1
+      selector:
+        text:
+          multiline: true

@@ -9,6 +9,7 @@ Mail: VBot.Assistant@gmail.com
 import logging
 import json
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -19,7 +20,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.core import callback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from .const import DOMAIN, CONF_DEVICE_ID
+from .const import (
+    DOMAIN, CONF_DEVICE_ID, VBot_URL_API,
+    CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, normalize_vbot_url,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,10 +37,20 @@ async def async_setup_entry(
         _LOGGER.error("Không tìm thấy device_id trong cấu hình")
         return
 
-    async_add_entities([VBotMediaPlayer(hass, device)])
+    api_url = entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, ""))
+    use_host_default_cover = entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID
+    async_add_entities([
+        VBotMediaPlayer(hass, device, api_url, use_host_default_cover)
+    ])
 
 class VBotMediaPlayer(MediaPlayerEntity):
-    def __init__(self, hass: HomeAssistant, device: str):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        device: str,
+        api_url: str = "",
+        use_host_default_cover: bool = False,
+    ):
         self._hass = hass
         self._device = device
         self._attr_name = f"Media Player ({device})"
@@ -65,6 +79,10 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._attr_media_image_url = None
         self._attr_volume_level = None
         self._source_kind = None
+        self._default_cover_url = (
+            self._build_host_default_cover_url(api_url)
+            if use_host_default_cover else None
+        )
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -115,7 +133,13 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._attr_media_artist = payload.get("artist")
         self._attr_media_album_name = payload.get("album")
         self._media_url = payload.get("media_url")
-        self._attr_media_image_url = payload.get("cover")
+        cover = str(payload.get("cover") or "").strip()
+        self._attr_media_image_url = (
+            cover
+            or (self._default_cover_url if self._attr_state in (
+                MediaPlayerState.PLAYING, MediaPlayerState.PAUSED
+            ) else None)
+        )
         self._attr_source = payload.get("source")
         self._source_kind = payload.get("source_kind")
         self._playlist_active = bool(payload.get("playlist_active"))
@@ -131,6 +155,17 @@ class VBotMediaPlayer(MediaPlayerEntity):
         else:
             self._attr_media_position_updated_at = None
         self.async_write_ha_state()
+
+    @staticmethod
+    def _build_host_default_cover_url(api_url: str):
+        normalized = normalize_vbot_url(api_url)
+        if not normalized:
+            return None
+        parsed = urlsplit(normalized)
+        if not parsed.hostname:
+            return None
+        host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+        return f"{parsed.scheme or 'http'}://{host}/assets/img/logo.png"
 
     @staticmethod
     def _number_or_none(value):
@@ -173,7 +208,8 @@ class VBotMediaPlayer(MediaPlayerEntity):
             "action": "play",
             "media_link": self._media_url,
             "media_name": self._media_title,
-            "media_player_source": "MQTT"
+            "media_player_source": "MQTT",
+            "media_cover": kwargs.get("media_image_url", "") or (kwargs.get("metadata") or {}).get("thumbnail", "")
         }
 
         await mqtt.async_publish(

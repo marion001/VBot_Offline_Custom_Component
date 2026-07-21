@@ -21,7 +21,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.event import async_call_later
-from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, normalize_vbot_url
+from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, normalize_vbot_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -627,9 +627,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:repeat-variant"
           },
     ]
+    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+        supported = {
+            "conversation_mode", "mic_on_off", "media_player_active",
+            "wake_up_in_media_player", "playlist_loop",
+        }
+        switches = [
+            item for item in switches
+            if any(f"/switch/{name}/set" in item["command_topic"] for name in supported)
+        ]
+        switches.append({
+            "name": f"Bluetooth Active ({device})",
+            "state_topic": f"{device}/switch/bluetooth_active/state",
+            "command_topic": f"{device}/switch/bluetooth_active/set",
+            "payload_on": "ON", "payload_off": "OFF",
+            "state_on": "ON", "state_off": "OFF",
+            "optimistic": False, "qos": 1, "retain": True,
+            "icon": "mdi:bluetooth",
+        })
     ents = [MQTTSwitch(hass, device=device, **s) for s in switches]
     hass.data[DOMAIN][VBot_URL_API] = vbot_url
-    ents.append(VBotCheckAllUpdatesSwitch(hass, device))
+    if entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID:
+        ents.append(VBotCheckAllUpdatesSwitch(hass, device))
     async_add_entities(ents, update_before_add=True)
 
 #Lấy chỉ IP từ VBot URL config

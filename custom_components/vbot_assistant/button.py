@@ -14,7 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import DiscoveryInfoType
-from .const import DOMAIN, CONF_DEVICE_ID
+from homeassistant.helpers import entity_registry as er
+from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -174,6 +175,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         }
     ]
 
+    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+        supported_payloads = {
+            "PAUSE", "STOP", "RESUME", "MEDIA_PLAY_DYNAMIC",
+            "UP", "DOWN", "MIN", "MAX", "LOCAL", "PLAY", "NEXT", "PREV",
+            "RESTART_VBOT_SERVICE", "REBOOT_OS", "RESTART_INTERFACE",
+        }
+        buttons_config = [
+            item for item in buttons_config
+            if item.get("payload") in supported_payloads
+            or item.get("topic", "").endswith("/script/vbot_tts/set")
+        ]
+        buttons_config.append({
+            "id": f"{device}_bluetooth_pairing",
+            "name": f"Mở Kết Nối Bluetooth ({device})",
+            "icon": "mdi:bluetooth-connect",
+            "topic": f"{device}/script/bluetooth_control/set",
+            "payload": "PAIRING",
+        })
+        buttons_config.append({
+            "id": f"{device}_bluetooth_disconnect",
+            "name": f"Ngắt Kết Nối Bluetooth ({device})",
+            "icon": "mdi:bluetooth-off",
+            "topic": f"{device}/script/bluetooth_control/set",
+            "payload": "DISCONNECT",
+        })
     entities = []
     for btn in buttons_config:
         entities.append(
@@ -222,6 +248,17 @@ class VBotMQTTButton(ButtonEntity):
             payload = self._payload
             if self._template_input:
                 state_obj = self._hass.states.get(self._template_input)
+                if not state_obj and self._device:
+                    registry = er.async_get(self._hass)
+                    unique_suffix = "vbot_tts" if "vbot_tts" in self._template_input else (
+                        "vbot_play_music_link_url" if "play_music" in self._template_input else None
+                    )
+                    if unique_suffix:
+                        entity_id = registry.async_get_entity_id(
+                            "text", DOMAIN, f"{self._device.lower()}_{unique_suffix}"
+                        )
+                        if entity_id:
+                            state_obj = self._hass.states.get(entity_id)
                 if not state_obj:
                     # Entity ID có thể đã được đổi trong giao diện HASS hoặc
                     # được tạo từ tên hiển thị thay vì unique_id.

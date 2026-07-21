@@ -12,7 +12,10 @@ from homeassistant.components import conversation
 from homeassistant.components import mqtt
 import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
-from .const import (DOMAIN, TTS_DOMAIN, CONF_DEVICE_ID, VBot_URL_API)
+from .const import (
+    DOMAIN, TTS_DOMAIN, CONF_DEVICE_ID, VBot_URL_API,
+    CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, platforms_for_device,
+)
 from .conversation_agent import VBotConversationAgent
 
 #Hàm khởi tạo chung, không làm gì nếu không dùng YAML
@@ -49,12 +52,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     hass.data[DOMAIN][entry.entry_id] = entry.data
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     device_id = entry.data.get(CONF_DEVICE_ID)
-    if device_id:
+    if device_id and entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID:
         agent = VBotConversationAgent(hass, entry, device_id)
         conversation.async_set_agent(hass, entry, agent)
     await hass.config_entries.async_forward_entry_setups(
-        entry,
-        ["switch", "number", "sensor", "select", "button", "text", "media_player"]
+        entry, platforms_for_device(entry.data)
     )
     return True
 
@@ -66,9 +68,9 @@ async def _async_reload_entry(hass: HomeAssistant, entry: config_entries.ConfigE
 #Gỡ bỏ khi người dùng xóa cấu hình
 async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     await hass.config_entries.async_unload_platforms(
-        entry,
-        ["switch", "number", "sensor", "select", "button", "text", "media_player"]
+        entry, platforms_for_device(entry.data)
     )
     hass.data[DOMAIN].pop(entry.entry_id, None)
-    conversation.async_unset_agent(hass, entry)
+    if entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID:
+        conversation.async_unset_agent(hass, entry)
     return True
