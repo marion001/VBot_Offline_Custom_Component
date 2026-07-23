@@ -14,7 +14,10 @@ import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 from .const import (
     DOMAIN, TTS_DOMAIN, CONF_DEVICE_ID, VBot_URL_API,
-    CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, platforms_for_device,
+    CONF_DEVICE_TYPE, CONF_AUTO_UPDATE_URL, CONF_URL_SOURCE,
+    URL_SOURCE_MANUAL, URL_SOURCE_MDNS,
+    DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32,
+    normalize_vbot_url, platforms_for_device,
 )
 from .conversation_agent import VBotConversationAgent
 
@@ -46,13 +49,70 @@ async def async_setup(hass: HomeAssistant, config: dict):
         )
     return True
 
+
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: config_entries.ConfigEntry
+) -> bool:
+    """Migrate legacy entries without changing their identity or entities."""
+    if entry.version > 2:
+        return False
+    if entry.version == 2:
+        return True
+
+    data = dict(entry.data)
+    options = dict(entry.options)
+    device_type = data.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST)
+    if device_type not in (
+        DEVICE_TYPE_HOST,
+        DEVICE_TYPE_ANDROID,
+        DEVICE_TYPE_ESP32,
+    ):
+        device_type = DEVICE_TYPE_HOST
+    raw_url = options.get(VBot_URL_API, data.get(VBot_URL_API, ""))
+    normalized_url = normalize_vbot_url(raw_url, device_type)
+
+    # Legacy entries are intentionally treated as manual so an mDNS
+    # advertisement cannot unexpectedly replace a user-configured address.
+    source = options.get(
+        CONF_URL_SOURCE,
+        data.get(CONF_URL_SOURCE, URL_SOURCE_MANUAL),
+    )
+    if source not in (URL_SOURCE_MANUAL, URL_SOURCE_MDNS):
+        source = URL_SOURCE_MANUAL
+    auto_update = bool(
+        options.get(
+            CONF_AUTO_UPDATE_URL,
+            data.get(CONF_AUTO_UPDATE_URL, source == URL_SOURCE_MDNS),
+        )
+    )
+    source = URL_SOURCE_MDNS if auto_update else URL_SOURCE_MANUAL
+
+    data.update({
+        CONF_DEVICE_TYPE: device_type,
+        VBot_URL_API: normalized_url,
+        CONF_AUTO_UPDATE_URL: auto_update,
+        CONF_URL_SOURCE: source,
+    })
+    options.update({
+        VBot_URL_API: normalized_url,
+        CONF_AUTO_UPDATE_URL: auto_update,
+        CONF_URL_SOURCE: source,
+    })
+    hass.config_entries.async_update_entry(
+        entry,
+        data=data,
+        options=options,
+        version=2,
+    )
+    return True
+
 #Gọi khi người dùng thêm 1 cấu hình integration
 async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     device_id = entry.data.get(CONF_DEVICE_ID)
-    if device_id and entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID:
+    if device_id and entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST:
         agent = VBotConversationAgent(hass, entry, device_id)
         conversation.async_set_agent(hass, entry, agent)
     await hass.config_entries.async_forward_entry_setups(
@@ -71,6 +131,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEn
         entry, platforms_for_device(entry.data)
     )
     hass.data[DOMAIN].pop(entry.entry_id, None)
-    if entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID:
+    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST:
         conversation.async_unset_agent(hass, entry)
     return True

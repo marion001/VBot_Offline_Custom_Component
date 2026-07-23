@@ -7,7 +7,7 @@ Custom component kết nối một hoặc nhiều loa VBot với Home Assistant 
 - Media Player: play, pause, resume, stop, next, previous, seek, volume và mute.
 - Đồng bộ tên bài, nguồn phát, nghệ sĩ, album, ảnh bìa, thời lượng và trạng thái online.
 - Điều khiển nhạc nội bộ, playlist, AirPlay và Bluetooth theo khả năng của từng nguồn.
-- Phát TTS bằng Text + Button hoặc service `tts_vbot_assistant.say`.
+- Phát TTS bằng Text + Button hoặc service `vbot_assistant.say`.
 - Dùng VBot làm Conversation Agent cho Home Assistant Assist.
 - Điều khiển các switch cấu hình VBot, âm lượng, LED và nguồn nội dung.
 - Hiển thị phiên bản chương trình/giao diện VBot và kiểm tra cập nhật.
@@ -20,6 +20,33 @@ Custom component kết nối một hoặc nhiều loa VBot với Home Assistant 
 3. Mỗi loa phải có `mqtt_client_name` riêng, ví dụ `VBot_Phong_Khach`.
 4. API VBot phải truy cập được từ Home Assistant, ví dụ `192.168.1.20:5002`.
 
+## Loại thiết bị và URL API
+
+Khi thêm thủ công, chọn đúng loại thiết bị. Có thể nhập URL có hoặc không có
+`http://` và có hoặc không có dấu `/` cuối:
+
+| Loại thiết bị | Ví dụ nhập | URL được sử dụng |
+|---|---|---|
+| Loa chủ VBot | `192.168.1.10` | `http://192.168.1.10:5002` |
+| Phicomm R1 Client | `192.168.1.20` | `http://192.168.1.20:8081` |
+| ESP32/ESP32-S3 Client | `192.168.1.30` | `http://192.168.1.30` |
+
+Nếu đã nhập port riêng, integration giữ nguyên port đó. ESP32 mặc định dùng
+HTTP cổng 80 nên không tự thêm port.
+
+Thiết bị thêm thủ công mặc định giữ URL cố định. Thiết bị thêm bằng mDNS mặc
+định bật **Tự động cập nhật URL API qua mDNS**. Có thể thay đổi chế độ này
+trong phần **Cấu hình** của Config Entry.
+
+Các entity thuộc nhóm chẩn đoán:
+
+- `URL API Hiện Tại`
+- `Nguồn URL API`
+- `Lần Cập Nhật URL Qua mDNS`
+
+Khi mDNS phát hiện cùng `device_id` ở IP mới, integration cập nhật entry hiện
+có và reload các entity; không tạo thêm thiết bị trùng.
+
 ## Cài đặt bằng HACS
 
 1. Vào **HACS → Kho lưu trữ tùy chỉnh**.
@@ -28,9 +55,6 @@ Custom component kết nối một hoặc nhiều loa VBot với Home Assistant 
 4. Khởi động lại Home Assistant.
 5. Vào **Cài đặt → Thiết bị & dịch vụ → Thêm tích hợp → VBot Assistant**.
 6. Nhập MQTT Client Name và URL API của loa.
-7. Sau khi hoàn tất các bước sẽ tự động có các thực thể entity id xuất hiện
-8. Bạn có thể thêm nhiều thiết bị Loa VBot vào Home Assistant (HASS) bằng cách nhấn vào:
-    - Cài đặt -> Thiết bị & Dịch vụ -> VBot Assistant MQTT -> Thêm Mục -> điền tên Client MQTT của loa VBot khác vào
 
 URL API chấp nhận các dạng:
 
@@ -40,8 +64,9 @@ http://192.168.1.20:5002
 https://vbot.example.com
 ```
 
-
-       
+Khi nâng cấp từ phiên bản cũ lên `1.3.1`, Config Entry được migration tự động
+lên phiên bản 2. Entry cũ được giữ ở chế độ URL thủ công để tránh thay đổi địa
+chỉ ngoài ý muốn; không cần xóa và thêm lại integration.
 
 ## Thêm nhiều loa
 
@@ -144,7 +169,7 @@ action:
 Service dùng chung cho mọi loa; `device_id` là MQTT Client Name của loa đích:
 
 ```yaml
-service: tts_vbot_assistant.say
+service: vbot_assistant.say
 data:
   device_id: VBot_Phong_Khach
   message: "Xin chào, đây là thông báo từ Home Assistant"
@@ -153,7 +178,7 @@ data:
 Có thể dùng `text` thay cho `message`:
 
 ```yaml
-service: tts_vbot_assistant.say
+service: vbot_assistant.say
 data:
   device_id: VBot_Phong_Ngu
   text: "Đã đến giờ đi ngủ"
@@ -168,7 +193,7 @@ trigger:
     entity_id: binary_sensor.cua_chinh
     to: "on"
 action:
-  - service: tts_vbot_assistant.say
+  - service: vbot_assistant.say
     data:
       device_id: VBot_Phong_Khach
       message: "Cửa chính đang mở"
@@ -281,9 +306,3 @@ Seek chỉ hỗ trợ Media Player nội bộ. Home Assistant gửi giây; compo
 
 - VBot Offline: https://github.com/marion001/VBot_Offline
 - Hỗ trợ: https://www.facebook.com/groups/1148385343358824
-
-
-<img width="1911" height="915" alt="Image" src="https://github.com/user-attachments/assets/5ed4cfb8-6b05-428d-959c-328149373f60" />
-<img width="1901" height="909" alt="Image" src="https://github.com/user-attachments/assets/b2437e4c-d41c-46b2-a094-a3d136001448" />
-<img width="1887" height="901" alt="Image" src="https://github.com/user-attachments/assets/74429691-9bb3-49b1-b72d-ea136776c33d" />
-<img width="1913" height="919" alt="Image" src="https://github.com/user-attachments/assets/3189100c-afe1-4fe7-81dd-d17a4a0df770" />

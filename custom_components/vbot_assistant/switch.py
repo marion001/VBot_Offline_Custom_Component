@@ -21,14 +21,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.event import async_call_later
-from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, normalize_vbot_url
+from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url
+from .availability import MQTTAvailabilityMixin
 
 _LOGGER = logging.getLogger(__name__)
 
 #Thời gian mỗi lần kiểm tra cập nhật VBot mới (Phút)
 VBOT_UPDATE_INTERVAL_MINUTES = 720 #720 = 12 tiếng
 
-class MQTTSwitch(SwitchEntity):
+class MQTTSwitch(MQTTAvailabilityMixin, SwitchEntity):
     def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain, icon=None, device=None):
         self._hass = hass
         self._name = name
@@ -44,11 +45,28 @@ class MQTTSwitch(SwitchEntity):
         self._state_off = state_off
         self._optimistic = optimistic
         self._qos = qos
-        self._retain = retain
         self._is_on = False
+        self._legacy_retained_command_cleared = False
+
+    async def _async_clear_legacy_retained_command(self):
+        """Xóa retained command cũ một lần trước lệnh mới đầu tiên."""
+        if self._legacy_retained_command_cleared:
+            return
+        await mqtt.async_publish(
+            self._hass,
+            self._command_topic,
+            "",
+            self._qos,
+            True,
+        )
+        self._legacy_retained_command_cleared = True
 
     async def async_added_to_hass(self):
-        await mqtt.async_subscribe(self._hass, self._state_topic, self._message_received, self._qos)
+        await super().async_added_to_hass()
+        unsubscribe = await mqtt.async_subscribe(
+            self._hass, self._state_topic, self._message_received, self._qos
+        )
+        self.async_on_remove(unsubscribe)
 
     @property
     def name(self):
@@ -70,13 +88,29 @@ class MQTTSwitch(SwitchEntity):
         }
 
     async def async_turn_on(self, **kwargs):
-        await mqtt.async_publish(self._hass, self._command_topic, self._payload_on, self._qos, self._retain)
+        # Command topic không được retain, nếu không broker sẽ phát lại lệnh
+        # cũ mỗi khi VBot kết nối lại.
+        await self._async_clear_legacy_retained_command()
+        await mqtt.async_publish(
+            self._hass,
+            self._command_topic,
+            self._payload_on,
+            self._qos,
+            False,
+        )
         if self._optimistic:
             self._is_on = True
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
-        await mqtt.async_publish(self._hass, self._command_topic, self._payload_off, self._qos, self._retain)
+        await self._async_clear_legacy_retained_command()
+        await mqtt.async_publish(
+            self._hass,
+            self._command_topic,
+            self._payload_off,
+            self._qos,
+            False,
+        )
         if self._optimistic:
             self._is_on = False
             self.async_write_ha_state()
@@ -181,7 +215,7 @@ async def check_single_device_updates(hass, device_id):
             return
         vbot_url = normalize_vbot_url(target_entry.options.get(
             VBot_URL_API, target_entry.data.get(VBot_URL_API, "")
-        ))
+        ), target_entry.data.get(CONF_DEVICE_TYPE))
         hass.data[DOMAIN][VBot_URL_API] = vbot_url
         vbot_ip = get_vbot_ip(hass)
         if not vbot_ip:
@@ -218,7 +252,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     hass.data[DOMAIN].setdefault("device_tasks", {})
     cfg = entry.data
     device = cfg.get(CONF_DEVICE_ID)
-    vbot_url = cfg.get(VBot_URL_API)
+    vbot_url = normalize_vbot_url(
+        entry.options.get(VBot_URL_API, cfg.get(VBot_URL_API, "")),
+        cfg.get(CONF_DEVICE_TYPE),
+    )
     if not device:
         _LOGGER.error("[VBot Assistant MQTT] Không tìm thấy Tên Client trong mục cấu hình")
         return
@@ -645,9 +682,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "optimistic": False, "qos": 1, "retain": True,
             "icon": "mdi:bluetooth",
         })
+    elif entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32:
+        supported = {"conversation_mode", "mic_on_off"}
+        switches = [
+            item for item in switches
+            if any(f"/switch/{name}/set" in item["command_topic"] for name in supported)
+        ]
+        switches.append({
+            "name": f"Hotword Stream ({device})",
+            "state_topic": f"{device}/switch/hotword_stream/state",
+            "command_topic": f"{device}/switch/hotword_stream/set",
+            "payload_on": "ON", "payload_off": "OFF",
+            "state_on": "ON", "state_off": "OFF",
+            "optimistic": False, "qos": 1, "retain": True,
+            "icon": "mdi:account-voice",
+        })
+        switches.append({
+            "name": f"LED Active ({device})",
+            "state_topic": f"{device}/switch/led_active/state",
+            "command_topic": f"{device}/switch/led_active/set",
+            "payload_on": "ON", "payload_off": "OFF",
+            "state_on": "ON", "state_off": "OFF",
+            "optimistic": False, "qos": 1, "retain": True,
+            "icon": "mdi:led-strip-variant",
+        })
     ents = [MQTTSwitch(hass, device=device, **s) for s in switches]
     hass.data[DOMAIN][VBot_URL_API] = vbot_url
-    if entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID:
+    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST:
         ents.append(VBotCheckAllUpdatesSwitch(hass, device))
     async_add_entities(ents, update_before_add=True)
 

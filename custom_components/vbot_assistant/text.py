@@ -11,7 +11,11 @@ from homeassistant.components.text import TextEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID
+from .const import (
+    DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE,
+    DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32,
+)
+from .availability import MQTTAvailabilityMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,25 +57,32 @@ async def async_setup_entry(
         }
     ]
 
-    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+    if entry.data.get(CONF_DEVICE_TYPE) in (DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32):
         inputs_config = [
             item for item in inputs_config
-            if item["id"].endswith("_vbot_tts") or item["id"].endswith("_vbot_play_music_link_url")
+            if item["id"].endswith("_vbot_tts")
+            or item["id"].endswith("_vbot_play_music_link_url")
         ]
     entities = []
     for inp in inputs_config:
+        initial_value = inp.get("value", "")
+        if (
+            entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32
+            and inp["id"].endswith("_vbot_play_music_link_url")
+        ):
+            initial_value = "http://192.168.1.10/audio.mp3"
         entities.append(
             VBotTextEntity(
                 unique_id=inp["id"],
                 name=inp["name"],
                 device=device,
-                initial_value=inp.get("value", "")
+                initial_value=initial_value,
             )
         )
 
     async_add_entities(entities)
 
-class VBotTextEntity(TextEntity):
+class VBotTextEntity(MQTTAvailabilityMixin, TextEntity):
     def __init__(self, unique_id: str, name: str, device: str, initial_value: str = ""):
         self._attr_unique_id = unique_id
         self._attr_name = name

@@ -7,17 +7,22 @@ Mail: VBot.Assistant@gmail.com
 '''
 
 import voluptuous as vol
+from datetime import datetime, timezone
+from urllib.parse import urlsplit
 from homeassistant import config_entries
 from homeassistant.components import persistent_notification
 from .const import (
     DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE,
-    DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID,
+    DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32,
+    CONF_AUTO_UPDATE_URL, CONF_URL_SOURCE, CONF_MDNS_LAST_UPDATE,
+    URL_SOURCE_MANUAL, URL_SOURCE_MDNS,
+    normalize_vbot_url,
 )
 #import logging
 #_LOGGER = logging.getLogger(__name__)
 
 class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self):
         self.device_id = None
@@ -25,9 +30,15 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         errors = {}
         if user_input:
-            device_name = (getattr(self, "_discovered_device", {}).get("name", "VBot Assistant")).strip()
             self.device_id = user_input[CONF_DEVICE_ID].strip()
-            url_api = user_input[VBot_URL_API].strip()
+            device_type = user_input.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST)
+            if device_type not in (DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32):
+                device_type = DEVICE_TYPE_HOST
+            url_api = normalize_vbot_url(user_input[VBot_URL_API], device_type)
+            device_name = {
+                DEVICE_TYPE_ANDROID: "Phicomm R1 Client",
+                DEVICE_TYPE_ESP32: "ESP32 VBot Client",
+            }.get(device_type, "VBot Assistant")
             await self.async_set_unique_id(self.device_id)
             self._abort_if_unique_id_configured()
             #Kiểm tra trùng thủ công
@@ -38,13 +49,28 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 persistent_notification.async_dismiss(self.hass, notification_id=f"vbot_discovered_{self.device_id}",)
                 return self.async_create_entry(
-                    title=f"{device_name} {url_api.split(':')[0]} - (Tên Client MQTT: {self.device_id})",
-                    data={CONF_DEVICE_ID: self.device_id, VBot_URL_API: url_api},
-                    options={VBot_URL_API: url_api},
+                    title=f"{device_name} {urlsplit(url_api).hostname or url_api} - (Tên Client MQTT: {self.device_id})",
+                    data={
+                        CONF_DEVICE_ID: self.device_id,
+                        VBot_URL_API: url_api,
+                        CONF_DEVICE_TYPE: device_type,
+                        CONF_AUTO_UPDATE_URL: False,
+                        CONF_URL_SOURCE: URL_SOURCE_MANUAL,
+                    },
+                    options={
+                        VBot_URL_API: url_api,
+                        CONF_AUTO_UPDATE_URL: False,
+                        CONF_URL_SOURCE: URL_SOURCE_MANUAL,
+                    },
                 )
         schema = vol.Schema({
             vol.Required(CONF_DEVICE_ID, default="VBot"): str,
             vol.Required(VBot_URL_API, default="192.168.14.113:5002"): str,
+            vol.Required(CONF_DEVICE_TYPE, default=DEVICE_TYPE_HOST): vol.In({
+                DEVICE_TYPE_HOST: "Loa Chủ VBot",
+                DEVICE_TYPE_ANDROID: "Phicomm R1 Client",
+                DEVICE_TYPE_ESP32: "ESP32 / ESP32-S3 Client",
+            }),
         })
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
@@ -52,24 +78,65 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_zeroconf(self, discovery_info):
         properties = discovery_info.properties or {}
         device_id = properties.get("device_id", "").strip()
-        url_api = properties.get("url_api", "").strip()
         device_name = (properties.get("name") or "VBot Assistant").strip()
         device_version = (properties.get("version") or "N/A").strip()
         device_type = (properties.get(CONF_DEVICE_TYPE) or DEVICE_TYPE_HOST).strip()
-        if device_type not in (DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID):
+        if device_type not in (DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32):
             device_type = DEVICE_TYPE_HOST
+        url_api = normalize_vbot_url(properties.get("url_api", ""), device_type)
+        discovered_at = datetime.now(timezone.utc).isoformat()
         if not device_id or not url_api:
             return self.async_abort(reason="invalid_discovery_data")
         self._discovered_device = {
             CONF_DEVICE_ID: device_id,
             VBot_URL_API: url_api,
             CONF_DEVICE_TYPE: device_type,
+            CONF_AUTO_UPDATE_URL: True,
+            CONF_URL_SOURCE: URL_SOURCE_MDNS,
+            CONF_MDNS_LAST_UPDATE: discovered_at,
             "name": device_name,
             "version": device_version,
         }
-        #Nếu muốn giữ cơ chế abort khi trùng (để chỉ có 1 nút)
         await self.async_set_unique_id(device_id)
-        self._abort_if_unique_id_configured(updates=self._discovered_device)
+        existing_entry = next(
+            (
+                entry for entry in self._async_current_entries()
+                if entry.unique_id == device_id
+                or entry.data.get(CONF_DEVICE_ID) == device_id
+            ),
+            None,
+        )
+        if existing_entry is not None:
+            auto_update = existing_entry.options.get(
+                CONF_AUTO_UPDATE_URL,
+                existing_entry.data.get(
+                    CONF_AUTO_UPDATE_URL,
+                    existing_entry.data.get(CONF_URL_SOURCE) == URL_SOURCE_MDNS,
+                ),
+            )
+            if auto_update:
+                current_url = normalize_vbot_url(
+                    existing_entry.options.get(
+                        VBot_URL_API,
+                        existing_entry.data.get(VBot_URL_API, ""),
+                    ),
+                    existing_entry.data.get(CONF_DEVICE_TYPE, device_type),
+                )
+                if current_url != url_api:
+                    updated_data = {**existing_entry.data, **self._discovered_device}
+                    updated_options = {
+                        **existing_entry.options,
+                        VBot_URL_API: url_api,
+                        CONF_AUTO_UPDATE_URL: True,
+                        CONF_URL_SOURCE: URL_SOURCE_MDNS,
+                        CONF_MDNS_LAST_UPDATE: discovered_at,
+                    }
+                    self.hass.config_entries.async_update_entry(
+                        existing_entry,
+                        data=updated_data,
+                        options=updated_options,
+                    )
+            return self.async_abort(reason="already_configured")
 
         self.context["title_placeholders"] = {"name": device_name,}
         persistent_notification.async_create(
@@ -115,7 +182,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
         persistent_notification.async_dismiss(self.hass, notification_id=f"vbot_discovered_{device_id}",)
         return self.async_create_entry(
-            title=f"{device_name} - {url_api.split(':')[0]} (MQTT: {device_id})",
+            title=f"{device_name} - {urlsplit(url_api).hostname or url_api} (MQTT: {device_id})",
             data=self._discovered_device,
         )
 
@@ -130,12 +197,31 @@ class VBotOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         errors = {}
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            auto_update = bool(user_input.get(CONF_AUTO_UPDATE_URL, False))
+            return self.async_create_entry(
+                title="",
+                data={
+                    VBot_URL_API: normalize_vbot_url(
+                        user_input[VBot_URL_API],
+                        self._config_entry.data.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST),
+                    ),
+                    CONF_AUTO_UPDATE_URL: auto_update,
+                    CONF_URL_SOURCE: URL_SOURCE_MDNS if auto_update else URL_SOURCE_MANUAL,
+                },
+            )
         current_url = self._config_entry.options.get(
             VBot_URL_API,
             self._config_entry.data.get(VBot_URL_API, "192.168.14.113:5002")
         )
+        current_auto_update = self._config_entry.options.get(
+            CONF_AUTO_UPDATE_URL,
+            self._config_entry.data.get(
+                CONF_AUTO_UPDATE_URL,
+                self._config_entry.data.get(CONF_URL_SOURCE) == URL_SOURCE_MDNS,
+            ),
+        )
         schema = vol.Schema({
             vol.Required(VBot_URL_API, default=current_url): str,
+            vol.Required(CONF_AUTO_UPDATE_URL, default=current_auto_update): bool,
         })
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

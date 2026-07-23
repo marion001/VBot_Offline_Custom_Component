@@ -12,7 +12,8 @@ from homeassistant.components.number import NumberEntity
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID
+from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32
+from .availability import MQTTAvailabilityMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "qos": 1,
         },
     ]
-    if entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID:
+    if entry.data.get(CONF_DEVICE_TYPE) in (DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32):
         numbers.append({
             "name": f"Độ Sáng Đèn Led Slide ({device})",
             "state_topic": f"{device}/number/led_brightness/state",
@@ -51,7 +52,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ents = [MQTTNumber(hass, device=device, **n) for n in numbers]
     async_add_entities(ents, update_before_add=True)
 
-class MQTTNumber(NumberEntity):
+class MQTTNumber(MQTTAvailabilityMixin, NumberEntity):
     def __init__(self, hass, name, state_topic, command_topic, min_value, max_value, qos, unit_of_measurement, icon=None, device=None):
         self._hass = hass
         self._name = name
@@ -67,9 +68,11 @@ class MQTTNumber(NumberEntity):
         self._attr_icon = icon or "mdi:tune"
         self._attr_native_min_value = min_value
         self._attr_native_max_value = max_value
+        self._attr_native_step = 1
         self._attr_native_unit_of_measurement = unit_of_measurement
 
     async def async_added_to_hass(self):
+        await super().async_added_to_hass()
         unsubscribe = await mqtt.async_subscribe(
             self._hass,
             self._state_topic,
@@ -96,8 +99,15 @@ class MQTTNumber(NumberEntity):
         }
 
     async def async_set_native_value(self, value):
-        await mqtt.async_publish(self._hass, self._command_topic, str(value), self._qos, False)
-        self._value = value
+        normalized = int(round(max(self._min_value, min(self._max_value, float(value)))))
+        await mqtt.async_publish(
+            self._hass,
+            self._command_topic,
+            str(normalized),
+            self._qos,
+            False,
+        )
+        self._value = normalized
         self.async_write_ha_state()
 
     async def _message_received(self, msg):

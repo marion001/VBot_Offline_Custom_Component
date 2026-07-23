@@ -15,7 +15,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import DiscoveryInfoType
 from homeassistant.helpers import entity_registry as er
-from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID
+from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32
+from .availability import MQTTAvailabilityMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -150,7 +151,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "name": f"Stop VBot Button ({device})",
             "icon": "mdi:power-off",
             "topic": f"{device}/script/power_action/set",
-            "payload": "STOP_VBOT_SERRVICE"
+            "payload": "STOP_VBOT_SERVICE"
         },
         {
             "id": f"{device}_reboot_system_os",
@@ -172,14 +173,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:update",
             "command": "check_single_device_updates",
             "device_id": device
+        },
+        {
+            "id": f"{device}_state_sync",
+            "name": f"Đồng Bộ Trạng Thái ({device})",
+            "icon": "mdi:sync",
+            "topic": f"{device}/script/state_sync/set",
+            "payload": "SYNC"
         }
     ]
 
-    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32:
+        supported_payloads = {
+            "STOP", "MEDIA_PLAY_DYNAMIC", "UP", "DOWN",
+            "RESTART_VBOT_SERVICE", "RESTART_INTERFACE", "SYNC",
+        }
+        buttons_config = [
+            item for item in buttons_config
+            if item.get("payload") in supported_payloads
+            or item.get("topic", "").endswith("/script/vbot_tts/set")
+        ]
+        buttons_config.append({
+            "id": f"{device}_wakeup",
+            "name": f"WakeUp ({device})",
+            "icon": "mdi:microphone-message",
+            "topic": f"{device}/script/button_control/set",
+            "payload": "WAKEUP",
+        })
+    elif entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
         supported_payloads = {
             "PAUSE", "STOP", "RESUME", "MEDIA_PLAY_DYNAMIC",
             "UP", "DOWN", "MIN", "MAX", "LOCAL", "PLAY", "NEXT", "PREV",
             "RESTART_VBOT_SERVICE", "REBOOT_OS", "RESTART_INTERFACE",
+            "SYNC",
         }
         buttons_config = [
             item for item in buttons_config
@@ -193,6 +219,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "topic": f"{device}/script/bluetooth_control/set",
             "payload": "PAIRING",
         })
+        buttons_config.append({
+            "id": f"{device}_bluetooth_disconnect",
+            "name": f"Ngắt Kết Nối Bluetooth ({device})",
+            "icon": "mdi:bluetooth-off",
+            "topic": f"{device}/script/bluetooth_control/set",
+            "payload": "DISCONNECT",
+        })
+        buttons_config.append({
+            "id": f"{device}_wakeup",
+            "name": f"WakeUp ({device})",
+            "icon": "mdi:microphone-message",
+            "topic": f"{device}/script/button_control/set",
+            "payload": "WAKEUP",
+        })
+    else:
         buttons_config.append({
             "id": f"{device}_bluetooth_disconnect",
             "name": f"Ngắt Kết Nối Bluetooth ({device})",
@@ -218,7 +259,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         )
     async_add_entities(entities)
 
-class VBotMQTTButton(ButtonEntity):
+class VBotMQTTButton(MQTTAvailabilityMixin, ButtonEntity):
     def __init__(
         self,
         hass: HomeAssistant,

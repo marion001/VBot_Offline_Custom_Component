@@ -22,7 +22,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import (
     DOMAIN, CONF_DEVICE_ID, VBot_URL_API,
-    CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, normalize_vbot_url,
+    CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,10 +37,14 @@ async def async_setup_entry(
         _LOGGER.error("Không tìm thấy device_id trong cấu hình")
         return
 
-    api_url = entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, ""))
-    use_host_default_cover = entry.data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ANDROID
+    api_url = normalize_vbot_url(
+        entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, "")),
+        entry.data.get(CONF_DEVICE_TYPE),
+    )
+    use_host_default_cover = entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST
+    esp32_profile = entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32
     async_add_entities([
-        VBotMediaPlayer(hass, device, api_url, use_host_default_cover)
+        VBotMediaPlayer(hass, device, api_url, use_host_default_cover, esp32_profile)
     ])
 
 class VBotMediaPlayer(MediaPlayerEntity):
@@ -50,6 +54,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         device: str,
         api_url: str = "",
         use_host_default_cover: bool = False,
+        esp32_profile: bool = False,
     ):
         self._hass = hass
         self._device = device
@@ -57,6 +62,10 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._attr_unique_id = f"{device.lower()}_media_player"
         self._attr_state = MediaPlayerState.IDLE
         self._attr_supported_features = (
+            MediaPlayerEntityFeature.STOP
+            | MediaPlayerEntityFeature.PLAY_MEDIA
+            | MediaPlayerEntityFeature.VOLUME_SET
+            if esp32_profile else
             MediaPlayerEntityFeature.PLAY
             | MediaPlayerEntityFeature.PAUSE
             | MediaPlayerEntityFeature.STOP
@@ -69,7 +78,9 @@ class VBotMediaPlayer(MediaPlayerEntity):
         )
         self._media_title = None
         self._media_url = None
-        self._attr_available = False
+        # Do not make the player unusable while waiting for the retained
+        # availability message (and remain compatible with older VBot builds).
+        self._attr_available = True
         self._attr_source = None
         self._attr_media_artist = None
         self._attr_media_album_name = None
@@ -80,10 +91,10 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._attr_volume_level = None
         self._source_kind = None
         self._is_host_device = use_host_default_cover
-        self._default_cover_url = (
-            self._build_host_default_cover_url(api_url)
-            if use_host_default_cover else None
-        )
+        self._default_cover_url = self._build_default_cover_url(
+            api_url,
+            "/assets/img/logo.png",
+        ) if use_host_default_cover else None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -128,7 +139,6 @@ class VBotMediaPlayer(MediaPlayerEntity):
             "paused": MediaPlayerState.PAUSED,
             "idle": MediaPlayerState.IDLE,
         }
-        self._attr_available = True
         self._attr_state = state_mapping.get(state, MediaPlayerState.IDLE)
         self._media_title = payload.get("title")
         self._attr_media_artist = payload.get("artist")
@@ -158,7 +168,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     @staticmethod
-    def _build_host_default_cover_url(api_url: str):
+    def _build_default_cover_url(api_url: str, image_path: str):
         normalized = normalize_vbot_url(api_url)
         if not normalized:
             return None
@@ -166,7 +176,8 @@ class VBotMediaPlayer(MediaPlayerEntity):
         if not parsed.hostname:
             return None
         host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
-        return f"{parsed.scheme or 'http'}://{host}/assets/img/logo.png"
+        port = f":{parsed.port}" if parsed.port else ""
+        return f"{parsed.scheme or 'http'}://{host}{port}{image_path}"
 
     @staticmethod
     def _number_or_none(value):
@@ -247,9 +258,9 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_media_play(self):
-        # Nếu loa chủ đang rảnh thì không có phiên media để tiếp tục;
-        # lúc này nút Play sẽ phát playlist mặc định.
-        if self._is_host_device and self._attr_state == MediaPlayerState.IDLE:
+        # Khi loa đang rảnh thì không có phiên media để resume. Cả loa chủ và
+        # Phicomm R1 đều phát playlist mặc định khi người dùng nhấn Play.
+        if self._attr_state == MediaPlayerState.IDLE:
             topic = f"{self._device}/script/playlist_control/set"
             payload = "PLAY"
         else:

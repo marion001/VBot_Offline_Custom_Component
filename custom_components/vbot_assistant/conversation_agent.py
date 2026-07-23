@@ -22,7 +22,8 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
         self.entry = entry
         self.device_id = device_id
         self.base_url = normalize_vbot_url(
-            entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API))
+            entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API)),
+            entry.data.get("device_type"),
         )
 
     @property

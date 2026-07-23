@@ -12,7 +12,8 @@
                 "description": "Nhập Tên Client MQTT đã được cấu hình trên loa VBot",
                 "data": {
                     "device_id": "Tên Client MQTT của loa VBot",
-                    "vbot_url_api": "Địa chỉ API VBot (IP:PORT)",
+                    "vbot_url_api": "URL API (loa chủ :5002, Phicomm R1 :8081, ESP32 không cần port)",
+                    "device_type": "Loại thiết bị",
                     "vbot_processing_mode": "Chọn luồng xử lý dữ liệu của trợ lý Assist"
                 }
             },
@@ -20,7 +21,8 @@
                 "title": "Cấu hình lại VBot Assistant",
                 "description": "Thay đổi thông tin API hoặc chế độ xử lý cho trợ lý VBot",
                 "data": {
-                    "vbot_url_api": "Địa chỉ API VBot (IP:PORT)",
+                    "vbot_url_api": "URL API (chấp nhận có/không http:// và dấu / cuối)",
+                    "auto_update_url": "Tự động cập nhật URL API qua mDNS",
                     "vbot_processing_mode": "Chọn luồng xử lý dữ liệu của trợ lý Assist"
                 }
             },

@@ -12,6 +12,7 @@ from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from .const import DOMAIN, CONF_DEVICE_ID
+from .availability import MQTTAvailabilityMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
     async_add_entities(mqtt_entities + internal_entities, update_before_add=True)
 
-class MQTTSelect(SelectEntity):
+class MQTTSelect(MQTTAvailabilityMixin, SelectEntity):
     def __init__(self, hass, name, state_topic, command_topic, options, icon=None, device=None):
         self._hass = hass
         self._name = name
@@ -56,15 +57,20 @@ class MQTTSelect(SelectEntity):
         self._state = None
 
     async def async_added_to_hass(self):
-        await mqtt.async_subscribe(
+        await super().async_added_to_hass()
+        unsubscribe = await mqtt.async_subscribe(
             self._hass,
             self._state_topic,
             self._message_received,
             qos=1
         )
+        self.async_on_remove(unsubscribe)
 
     async def _message_received(self, msg):
         payload = msg.payload
+        if payload not in self._options:
+            _LOGGER.warning("Giá trị select không hợp lệ cho %s: %s", self._name, payload)
+            return
         _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
         self._state = payload
         self.async_write_ha_state()
@@ -93,6 +99,8 @@ class MQTTSelect(SelectEntity):
         }
 
     async def async_select_option(self, option):
+        if option not in self._options:
+            raise ValueError(f"Tùy chọn không hợp lệ: {option}")
         await mqtt.async_publish(
             self._hass,
             self._command_topic,
