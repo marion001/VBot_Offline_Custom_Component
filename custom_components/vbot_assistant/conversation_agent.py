@@ -12,7 +12,9 @@ import aiohttp
 from homeassistant.components import conversation
 from homeassistant.helpers import intent
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from .const import VBot_URL_API, normalize_vbot_url
+from .const import (
+    VBot_URL_API, CONF_API_KEY, normalize_vbot_url, vbot_api_headers,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +27,12 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
             entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API)),
             entry.data.get("device_type"),
         )
+        self.api_key = str(
+            entry.options.get(
+                CONF_API_KEY,
+                entry.data.get(CONF_API_KEY, ""),
+            )
+        ).strip()
 
     @property
     def supported_languages(self) -> list[str]:
@@ -66,7 +74,8 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                     "value": message
                 }
                 headers = {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    **vbot_api_headers(self.api_key),
                 }
                 timeout = aiohttp.ClientTimeout(total=15)
                 session = async_get_clientsession(self.hass)

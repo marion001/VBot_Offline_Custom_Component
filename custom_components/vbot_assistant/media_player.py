@@ -176,8 +176,9 @@ class VBotMediaPlayer(MediaPlayerEntity):
         if not parsed.hostname:
             return None
         host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
-        port = f":{parsed.port}" if parsed.port else ""
-        return f"{parsed.scheme or 'http'}://{host}{port}{image_path}"
+        # Ảnh tĩnh của loa chủ được phục vụ bởi WebUI trên cổng HTTP mặc định,
+        # không phải cổng API :5002.
+        return f"http://{host}{image_path}"
 
     @staticmethod
     def _number_or_none(value):

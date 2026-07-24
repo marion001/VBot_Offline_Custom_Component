@@ -21,6 +21,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url
 from .availability import MQTTAvailabilityMixin
 
@@ -850,17 +851,16 @@ async def check_all_updates(hass, device_id=None):
 #Kiểm tra cập nhật và trả về kết quả
 async def check_update_collect(hass, update_type, vbot_ip, display_name, github_path):
     result = {}
-    session = None
     try:
         file_path = "html/" if update_type == 'interface' else ""
         current_version_url = f"http://{vbot_ip}/includes/php_ajax/Show_file_path.php?read_file_path&file=/home/pi/VBot_Offline/{file_path}Version.json"
         timeout = aiohttp.ClientTimeout(total=15, connect=10)
-        session = aiohttp.ClientSession(timeout=timeout)
+        session = async_get_clientsession(hass)
         current_release_date = None
         new_version_info = None
         #Lấy phiên bản hiện tại Local
         try:
-            async with session.get(current_version_url) as response:
+            async with session.get(current_version_url, timeout=timeout) as response:
                 if response.status == 200:
                     response_text = await response.text()
                     try:
@@ -902,12 +902,6 @@ async def check_update_collect(hass, update_type, vbot_ip, display_name, github_
             _LOGGER.warning(f"ℹ️ [VBot] {display_name} - Không đủ dữ liệu để so sánh:")
     except Exception as e:
         _LOGGER.error(f"❌ [VBot] Lỗi check_update_collect {display_name}: {e}", exc_info=True)
-    finally:
-        if session and not session.closed:
-            try:
-                await session.close()
-            except:
-                pass
     return result
 
 #Lên lịch kiểm tra cập nhật phiên bản VBot

@@ -16,6 +16,7 @@ CONF_DEVICE_ID = "device_id"
 
 #URL API VBot: (IP:PORT <=> 192.168.14.194:5002)
 VBot_URL_API = "vbot_url_api"
+CONF_API_KEY = "vbot_api_key"
 CONF_DEVICE_TYPE = "device_type"
 CONF_AUTO_UPDATE_URL = "auto_update_url"
 CONF_URL_SOURCE = "url_source"
@@ -62,3 +63,9 @@ def normalize_vbot_url(value: str | None, device_type: str | None = None) -> str
         host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
         value = urlunsplit((parsed.scheme, f"{host}:{default_port}", parsed.path, parsed.query, parsed.fragment))
     return value
+
+
+def vbot_api_headers(api_key: str | None) -> dict[str, str]:
+    """Build the authentication header accepted by the VBot host API."""
+    value = (api_key or "").strip()
+    return {"VBot-API-Key": value} if value else {}

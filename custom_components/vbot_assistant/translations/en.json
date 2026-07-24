@@ -11,19 +11,27 @@
                 "title": "Liên kết VBot Assistant",
                 "description": "Nhập Tên Client MQTT đã được cấu hình trên loa VBot",
                 "data": {
+                    "vbot_api_key": "API Key loa chủ (VBot-API-Key, có thể để trống)",
                     "device_id": "Tên Client MQTT của loa VBot",
                     "vbot_url_api": "URL API (loa chủ :5002, Phicomm R1 :8081, ESP32 không cần port)",
                     "device_type": "Loại thiết bị",
                     "vbot_processing_mode": "Chọn luồng xử lý dữ liệu của trợ lý Assist"
+                },
+                "data_description": {
+                    "vbot_api_key": "Trong giao diện Cấu Hình Config WebUI hoặc file Config.json trên loa chủ, kiểm tra api → auth → active. Nếu đang là false thì không cần nhập VBot-API-Key. Sau khi đổi thành true, hãy nhập giá trị tại api → auth → api_key vào đây."
                 }
             },
             "init": {
                 "title": "Cấu hình lại VBot Assistant",
                 "description": "Thay đổi thông tin API hoặc chế độ xử lý cho trợ lý VBot",
                 "data": {
+                    "vbot_api_key": "API Key loa chủ (VBot-API-Key, có thể để trống)",
                     "vbot_url_api": "URL API (chấp nhận có/không http:// và dấu / cuối)",
                     "auto_update_url": "Tự động cập nhật URL API qua mDNS",
                     "vbot_processing_mode": "Chọn luồng xử lý dữ liệu của trợ lý Assist"
+                },
+                "data_description": {
+                    "vbot_api_key": "Mở giao diện Cấu Hình Config WebUI hoặc file Config.json trên loa chủ và kiểm tra api → auth → active. Khi là false, trường này có thể để trống. Khi đổi thành true, hãy nhập đúng giá trị tại api → auth → api_key."
                 }
             },
             "confirm": {
@@ -32,6 +40,11 @@
             }
         },
         "error": {
+            "invalid_auth": "API Key không đúng hoặc API loa chủ yêu cầu xác thực.",
+            "cannot_connect": "Không thể kết nối tới URL API đã nhập.",
+            "invalid_device": "API không trả về dữ liệu nhận dạng VBot hợp lệ.",
+            "wrong_device_type": "URL API không khớp với loại thiết bị đã chọn.",
+            "wrong_device_id": "Tên Client MQTT không khớp với cấu hình trên thiết bị.",
             "device_exists": "Thiết bị này đã được thêm vào Home Assistant.",
 			"no_discovery_data": "Không tìm thấy dữ liệu thiết bị mDNS.",
 			"invalid_discovery_data": "Dữ liệu thiết bị mDNS không hợp lệ.",

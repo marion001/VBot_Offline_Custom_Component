@@ -42,7 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         },
         {
             "id": f"{device}_media_control_stop",
-            "name": f"Media Stop Button ({device})",
+            "name": f"Dừng Media Player ({device})",
             "icon": "mdi:stop-circle-outline",
             "topic": f"{device}/script/media_control/set",
             "payload": "STOP"

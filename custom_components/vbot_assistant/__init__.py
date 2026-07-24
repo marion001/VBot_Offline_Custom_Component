@@ -13,7 +13,7 @@ from homeassistant.components import mqtt
 import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 from .const import (
-    DOMAIN, TTS_DOMAIN, CONF_DEVICE_ID, VBot_URL_API,
+    DOMAIN, TTS_DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_API_KEY,
     CONF_DEVICE_TYPE, CONF_AUTO_UPDATE_URL, CONF_URL_SOURCE,
     URL_SOURCE_MANUAL, URL_SOURCE_MDNS,
     DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32,
@@ -54,9 +54,9 @@ async def async_migrate_entry(
     hass: HomeAssistant, entry: config_entries.ConfigEntry
 ) -> bool:
     """Migrate legacy entries without changing their identity or entities."""
-    if entry.version > 2:
+    if entry.version > 3:
         return False
-    if entry.version == 2:
+    if entry.version == 3:
         return True
 
     data = dict(entry.data)
@@ -90,11 +90,17 @@ async def async_migrate_entry(
     data.update({
         CONF_DEVICE_TYPE: device_type,
         VBot_URL_API: normalized_url,
+        CONF_API_KEY: str(
+            options.get(CONF_API_KEY, data.get(CONF_API_KEY, ""))
+        ).strip(),
         CONF_AUTO_UPDATE_URL: auto_update,
         CONF_URL_SOURCE: source,
     })
     options.update({
         VBot_URL_API: normalized_url,
+        CONF_API_KEY: str(
+            options.get(CONF_API_KEY, data.get(CONF_API_KEY, ""))
+        ).strip(),
         CONF_AUTO_UPDATE_URL: auto_update,
         CONF_URL_SOURCE: source,
     })
@@ -102,7 +108,7 @@ async def async_migrate_entry(
         entry,
         data=data,
         options=options,
-        version=2,
+        version=3,
     )
     return True
 
