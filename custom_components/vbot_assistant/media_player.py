@@ -90,6 +90,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
         self._attr_media_image_url = None
         self._attr_volume_level = None
         self._source_kind = None
+        self._multiroom = {}
         self._is_host_device = use_host_default_cover
         self._default_cover_url = self._build_default_cover_url(
             api_url,
@@ -112,6 +113,31 @@ class VBotMediaPlayer(MediaPlayerEntity):
             qos=1,
         )
         self.async_on_remove(unsubscribe_availability)
+        unsubscribe_multiroom = await mqtt.async_subscribe(
+            self._hass, f"{self._device}/multiroom/state",
+            self._handle_multiroom_message, qos=1,
+        )
+        self.async_on_remove(unsubscribe_multiroom)
+
+    @callback
+    def _handle_multiroom_message(self, message) -> None:
+        try:
+            payload = json.loads(message.payload)
+            if isinstance(payload, dict):
+                self._multiroom = payload
+                if payload.get("has_media"):
+                    title = payload.get("title")
+                    cover = str(payload.get("cover") or "").strip()
+                    duration = self._number_or_none(payload.get("duration_ms"))
+                    if title:
+                        self._media_title = title
+                    if cover:
+                        self._attr_media_image_url = cover
+                    if duration is not None:
+                        self._attr_media_duration = duration
+                self.async_write_ha_state()
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            _LOGGER.warning("Snapshot Multiroom VBot không hợp lệ: %s", error)
 
     @callback
     def _handle_availability_message(self, message) -> None:
@@ -140,30 +166,46 @@ class VBotMediaPlayer(MediaPlayerEntity):
             "idle": MediaPlayerState.IDLE,
         }
         self._attr_state = state_mapping.get(state, MediaPlayerState.IDLE)
-        self._media_title = payload.get("title")
+        previous_title = self._media_title
+        previous_source_kind = self._source_kind
+        incoming_title = payload.get("title")
+        incoming_source_kind = payload.get("source_kind")
+        same_media = bool(
+            incoming_title and previous_title
+            and str(incoming_title) == str(previous_title)
+            and incoming_source_kind == previous_source_kind
+        )
+        self._media_title = incoming_title
         self._attr_media_artist = payload.get("artist")
         self._attr_media_album_name = payload.get("album")
         self._media_url = payload.get("media_url")
         cover = str(payload.get("cover") or "").strip()
-        self._attr_media_image_url = (
-            cover
-            or (self._default_cover_url if self._attr_state in (
-                MediaPlayerState.PLAYING, MediaPlayerState.PAUSED
-            ) else None)
-        )
+        active_state = self._attr_state in (MediaPlayerState.PLAYING, MediaPlayerState.PAUSED)
+        if cover:
+            self._attr_media_image_url = cover
+        elif not active_state:
+            self._attr_media_image_url = None
+        elif not same_media:
+            self._attr_media_image_url = self._default_cover_url
         self._attr_source = payload.get("source")
-        self._source_kind = payload.get("source_kind")
+        self._source_kind = incoming_source_kind
         self._playlist_active = bool(payload.get("playlist_active"))
+        self._playlist_id = payload.get("playlist_id")
+        self._playlist_name = payload.get("playlist_name")
         self._playlist_index = payload.get("playlist_index")
         self._playlist_total = payload.get("playlist_total", 0)
         self._playlist_loop = bool(payload.get("playlist_loop"))
-        self._attr_media_duration = self._number_or_none(payload.get("duration"))
-        self._attr_media_position = self._number_or_none(payload.get("position"))
+        incoming_duration = self._number_or_none(payload.get("duration"))
+        incoming_position = self._number_or_none(payload.get("position"))
+        if incoming_duration is not None or not active_state or not same_media:
+            self._attr_media_duration = incoming_duration
+        if incoming_position is not None or not active_state or not same_media:
+            self._attr_media_position = incoming_position
         volume = self._number_or_none(payload.get("volume"))
         self._attr_volume_level = None if volume is None else max(0.0, min(1.0, volume / 100.0))
-        if self._attr_media_position is not None:
+        if incoming_position is not None:
             self._attr_media_position_updated_at = datetime.now(timezone.utc)
-        else:
+        elif self._attr_media_position is None:
             self._attr_media_position_updated_at = None
         self.async_write_ha_state()
 
@@ -325,6 +367,13 @@ class VBotMediaPlayer(MediaPlayerEntity):
             "playlist_index": getattr(self, "_playlist_index", None),
             "playlist_total": getattr(self, "_playlist_total", 0),
             "playlist_loop": getattr(self, "_playlist_loop", False),
+            "playlist_id": getattr(self, "_playlist_id", None),
+            "playlist_name": getattr(self, "_playlist_name", None),
+            "multiroom_connected": bool(self._multiroom.get("connected")),
+            "multiroom_group_id": self._multiroom.get("group_id"),
+            "multiroom_coordinator": self._multiroom.get("coordinator_name") or self._multiroom.get("coordinator_host"),
+            "multiroom_has_media": bool(self._multiroom.get("has_media")),
+            "multiroom_paused": bool(self._multiroom.get("paused")),
         }
 
     @property

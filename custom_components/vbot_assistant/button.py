@@ -241,6 +241,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "topic": f"{device}/script/bluetooth_control/set",
             "payload": "DISCONNECT",
         })
+        buttons_config.extend([
+            {
+                "id": f"{device}_playlist_play_selected",
+                "name": f"Phát PlayList Được Chọn ({device})",
+                "icon": "mdi:playlist-play",
+                "topic": f"{device}/script/playlist_control/set",
+                "selection_unique_id": f"{device.lower()}_playlist_selected",
+                "selection_key": "playlist_id",
+                "selection_action": "play",
+            },
+            {
+                "id": f"{device}_multiroom_start_selected",
+                "name": f"Kết Nối Nhóm Multiroom Được Chọn ({device})",
+                "icon": "mdi:speaker-multiple",
+                "topic": f"{device}/script/multiroom_control/set",
+                "selection_unique_id": f"{device.lower()}_multiroom_group_selected",
+                "selection_key": "group_id",
+                "selection_action": "start",
+            },
+            {"id": f"{device}_multiroom_pause", "name": f"Tạm Dừng Multiroom ({device})", "icon": "mdi:pause", "topic": f"{device}/script/multiroom_control/set", "payload": '{"action":"pause"}'},
+            {"id": f"{device}_multiroom_resume", "name": f"Tiếp Tục Multiroom ({device})", "icon": "mdi:play", "topic": f"{device}/script/multiroom_control/set", "payload": '{"action":"resume"}'},
+            {"id": f"{device}_multiroom_stop", "name": f"Ngắt Kết Nối Multiroom ({device})", "icon": "mdi:speaker-off", "topic": f"{device}/script/multiroom_control/set", "payload": '{"action":"stop"}'},
+        ])
     entities = []
     for btn in buttons_config:
         entities.append(
@@ -253,6 +276,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 command=btn.get("command"),
                 device_id=btn.get("device_id"),
                 template_input=btn.get("template_input"),
+                selection_unique_id=btn.get("selection_unique_id"),
+                selection_key=btn.get("selection_key"),
+                selection_action=btn.get("selection_action"),
                 icon=btn.get("icon", "mdi:gesture-tap-button"),
                 device=device
             )
@@ -270,6 +296,9 @@ class VBotMQTTButton(MQTTAvailabilityMixin, ButtonEntity):
         command: str | None = None,
         device_id: str | None = None,
         template_input: str | None = None,
+        selection_unique_id: str | None = None,
+        selection_key: str | None = None,
+        selection_action: str | None = None,
         icon: str = "mdi:gesture-tap-button",
         device: str | None = None
     ):
@@ -281,12 +310,24 @@ class VBotMQTTButton(MQTTAvailabilityMixin, ButtonEntity):
         self._command = command
         self._device_id = device_id
         self._template_input = template_input
+        self._selection_unique_id = selection_unique_id
+        self._selection_key = selection_key
+        self._selection_action = selection_action
         self._attr_icon = icon
         self._device = device
 
     async def async_press(self) -> None:
         if self._topic:
             payload = self._payload
+            if self._selection_unique_id:
+                registry = er.async_get(self._hass)
+                entity_id = registry.async_get_entity_id("select", DOMAIN, self._selection_unique_id)
+                state_obj = self._hass.states.get(entity_id) if entity_id else None
+                selected_id = state_obj.attributes.get("selected_id") if state_obj else None
+                if not selected_id:
+                    _LOGGER.warning("Chưa chọn dữ liệu cho nút: %s", self._attr_name)
+                    return
+                payload = json.dumps({"action": self._selection_action, self._selection_key: selected_id})
             if self._template_input:
                 state_obj = self._hass.states.get(self._template_input)
                 if not state_obj and self._device:
