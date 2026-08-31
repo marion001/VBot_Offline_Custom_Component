@@ -1,7 +1,7 @@
 {
     "domain": "vbot_assistant",
     "name": "VBot Assistant",
-    "version": "1.4.3",
+    "version": "1.4.4",
     "documentation": "https://github.com/marion001/VBot_Offline_Custom_Component",
     "issue_tracker": "https://github.com/marion001/VBot_Offline_Custom_Component/issues",
     "requirements": [

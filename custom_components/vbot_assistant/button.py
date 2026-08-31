@@ -168,6 +168,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "payload": "RESTART_INTERFACE"
         },
         {
+            "id": f"{device}_update_vbot_program",
+            "name": f"Cập Nhật Chương Trình VBot ({device})",
+            "icon": "mdi:application-import",
+            "topic": f"{device}/script/system_update/set",
+            "payload": "program"
+        },
+        {
+            "id": f"{device}_update_vbot_interface",
+            "name": f"Cập Nhật Giao Diện VBot ({device})",
+            "icon": "mdi:web-sync",
+            "topic": f"{device}/script/system_update/set",
+            "payload": "interface"
+        },
+        {
             "id": f"{device}_check_updates",
             "name": f"VBot Check Updates ({device})",
             "icon": "mdi:update",
