@@ -28,8 +28,8 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    cfg = entry.data
-    device = cfg.get(CONF_DEVICE_ID)
+    runtime = entry.runtime_data
+    device = runtime.device_id
     if not device:
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
@@ -57,7 +57,7 @@ async def async_setup_entry(
         }
     ]
 
-    if entry.data.get(CONF_DEVICE_TYPE) in (DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32):
+    if runtime.device_type in (DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32):
         inputs_config = [
             item for item in inputs_config
             if item["id"].endswith("_vbot_tts")
@@ -67,7 +67,7 @@ async def async_setup_entry(
     for inp in inputs_config:
         initial_value = inp.get("value", "")
         if (
-            entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32
+            runtime.device_type == DEVICE_TYPE_ESP32
             and inp["id"].endswith("_vbot_play_music_link_url")
         ):
             initial_value = "http://192.168.1.10/audio.mp3"

@@ -11,28 +11,16 @@ import asyncio
 import aiohttp
 from homeassistant.components import conversation
 from homeassistant.helpers import intent
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from .const import (
-    VBot_URL_API, CONF_API_KEY, normalize_vbot_url, vbot_api_headers,
-)
+from .runtime import VBotRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
 
 class VBotConversationAgent(conversation.AbstractConversationAgent):
-    def __init__(self, hass, entry, device_id: str):
+    def __init__(self, hass, entry, runtime: VBotRuntimeData):
         self.hass = hass
         self.entry = entry
-        self.device_id = device_id
-        self.base_url = normalize_vbot_url(
-            entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API)),
-            entry.data.get("device_type"),
-        )
-        self.api_key = str(
-            entry.options.get(
-                CONF_API_KEY,
-                entry.data.get(CONF_API_KEY, ""),
-            )
-        ).strip()
+        self.runtime = runtime
+        self.device_id = runtime.device_id
 
     @property
     def supported_languages(self) -> list[str]:
@@ -64,33 +52,26 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
         try:
             #Nếu chọn Luồng API
             if processing_stream == "api":
-                if not self.base_url:
+                if not self.runtime.api_url:
                     raise ValueError("Chưa cấu hình URL API VBot")
-                url = f"{self.base_url}/"
                 payload = {
                     "type": 3,
                     "data": "main_processing",
                     "action": vbot_mode,
                     "value": message
                 }
-                headers = {
-                    "Content-Type": "application/json",
-                    **vbot_api_headers(self.api_key),
-                }
-                timeout = aiohttp.ClientTimeout(total=15)
-                session = async_get_clientsession(self.hass)
-                async with session.post(url, json=payload, headers=headers, timeout=timeout) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if data.get("success") and "message" in data:
-                                response_text = data["message"]
-                            else:
-                                _LOGGER.error(f"[VBot Assist] Lỗi định dạng phản hồi API: {data}")
-                                response_text = f"Không có dữ liệu phản hồi: {data.get('message')}"
-                        else:
-                            error_body = await resp.text()
-                            _LOGGER.error(f"[VBot Assist] Không thể lấy phản hồi từ API: {error_body}")
-                            response_text = "Lỗi khi lấy dữ liệu phản hồi"
+                status, data = await self.runtime.client.async_post("", payload)
+                if status == 200:
+                    if data.get("success") and "message" in data:
+                        response_text = data["message"]
+                    else:
+                        _LOGGER.error(f"[VBot Assist] Lỗi định dạng phản hồi API: {data}")
+                        response_text = f"Không có dữ liệu phản hồi: {data.get('message')}"
+                else:
+                    _LOGGER.error(f"[VBot Assist] Không thể lấy phản hồi từ API: {data}")
+                    if status == 401:
+                        self.entry.async_start_reauth_if_available(self.hass)
+                    response_text = "Lỗi khi lấy dữ liệu phản hồi"
             else:
                 raise ValueError(f"Luồng xử lý không hợp lệ: {processing_stream}")
 

@@ -37,6 +37,22 @@
             "confirm": {
                 "title": "Tìm thấy thiết bị VBot ({name})",
                 "description": "- Tên Thiết Bị: **{name}**\n- Tên Client MQTT: **{device}**\n - Địa chỉ IP:API: **{host}**\n- Phiên Bản Chương Trình: **{version}**\n\nBạn có muốn thêm thiết bị này vào Home Assistant không?"
+            },
+            "reconfigure": {
+                "title": "Cấu hình lại VBot Assistant",
+                "description": "Cập nhật kết nối mà không xóa thiết bị hoặc entity hiện có.",
+                "data": {
+                    "vbot_api_key": "API Key loa chủ (có thể để trống)",
+                    "vbot_url_api": "URL API VBot",
+                    "auto_update_url": "Tự động cập nhật URL API qua mDNS"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Xác thực lại VBot Assistant",
+                "description": "VBot từ chối API key hiện tại. Hãy nhập API key hợp lệ cho {name}.",
+                "data": {
+                    "vbot_api_key": "API Key loa chủ (có thể để trống nếu xác thực đã tắt)"
+                }
             }
         },
         "error": {
@@ -49,6 +65,24 @@
 			"no_discovery_data": "Không tìm thấy dữ liệu thiết bị mDNS.",
 			"invalid_discovery_data": "Dữ liệu thiết bị mDNS không hợp lệ.",
 			"discovery_pending": "Thiết bị này đang chờ xác nhận từ phát hiện tự động (mDNS). Bạn có thể chờ hoặc thêm thủ công với thông tin khác."
+        }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "wake_word": "Wake word detected",
+            "stt_result": "Speech recognized",
+            "command_received": "Command received",
+            "tts_started": "TTS started",
+            "tts_finished": "TTS finished",
+            "tts_error": "TTS error",
+            "tts_cancelled": "TTS cancelled",
+            "bluetooth_connected": "Bluetooth connected",
+            "bluetooth_disconnected": "Bluetooth disconnected",
+            "multiroom_joined": "Multiroom joined",
+            "multiroom_left": "Multiroom left",
+            "media_started": "Media started",
+            "media_paused": "Media paused",
+            "media_stopped": "Media stopped"
         }
     }
 }

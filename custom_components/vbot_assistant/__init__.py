@@ -10,6 +10,9 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.components import conversation
 from homeassistant.components import mqtt
+from homeassistant.const import ATTR_DEVICE_ID, ATTR_ENTITY_ID
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 from .const import (
@@ -20,21 +23,92 @@ from .const import (
     normalize_vbot_url, platforms_for_device,
 )
 from .conversation_agent import VBotConversationAgent
+from .runtime import build_runtime_data
+from .events import async_setup_event_bridge
+
+
+def _as_list(value):
+    """Normalize a service target field to a list."""
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _resolve_tts_devices(hass: HomeAssistant, call_data: dict) -> list[str]:
+    """Resolve HA devices/entities and legacy MQTT client IDs."""
+    configured = {}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        device_id = str(entry.data.get(CONF_DEVICE_ID, "")).strip()
+        if device_id:
+            configured[device_id.lower()] = device_id
+
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    resolved = []
+
+    for value in _as_list(call_data.get(ATTR_DEVICE_ID)):
+        target = str(value or "").strip()
+        if not target:
+            continue
+        device = device_registry.async_get(target, include_child_devices=False)
+        if device:
+            identifiers = [
+                identifier for domain, identifier in device.identifiers
+                if domain == DOMAIN
+            ]
+            if not identifiers:
+                raise ServiceValidationError(
+                    f"Thiết bị {target} không thuộc VBot Assistant"
+                )
+            resolved.extend(identifiers)
+            continue
+        legacy = configured.get(target.lower())
+        if not legacy:
+            raise ServiceValidationError(
+                f"Không tìm thấy VBot hoặc MQTT client ID: {target}"
+            )
+        resolved.append(legacy)
+
+    for value in _as_list(call_data.get(ATTR_ENTITY_ID)):
+        entity_id = str(value or "").strip()
+        registry_entry = entity_registry.async_get(entity_id)
+        if not registry_entry or registry_entry.platform != DOMAIN:
+            raise ServiceValidationError(
+                f"Entity {entity_id} không thuộc VBot Assistant"
+            )
+        if registry_entry.device_id:
+            device = device_registry.async_get(
+                registry_entry.device_id, include_child_devices=False
+            )
+            identifiers = (
+                [identifier for domain, identifier in device.identifiers if domain == DOMAIN]
+                if device else []
+            )
+            resolved.extend(identifiers)
+
+    return list(dict.fromkeys(
+        configured[value.lower()]
+        for value in resolved
+        if value.lower() in configured
+    ))
 
 #Hàm khởi tạo chung, không làm gì nếu không dùng YAML
 async def async_setup(hass: HomeAssistant, config: dict):
     async def handle_tts(call):
         message = str(call.data.get("message", call.data.get("text", ""))).strip()
-        device_id = str(call.data.get(CONF_DEVICE_ID, "")).strip()
-        if not message or not device_id:
-            return
-        await mqtt.async_publish(
-            hass,
-            f"{device_id}/script/vbot_tts/set",
-            message,
-            qos=1,
-            retain=False,
-        )
+        if not message:
+            raise ServiceValidationError("Nội dung TTS không được để trống")
+        device_ids = _resolve_tts_devices(hass, call.data)
+        if not device_ids:
+            raise ServiceValidationError("Hãy chọn ít nhất một thiết bị VBot")
+        for device_id in device_ids:
+            await mqtt.async_publish(
+                hass,
+                f"{device_id}/script/vbot_tts/set",
+                message,
+                qos=1,
+                retain=False,
+            )
 
     if not hass.services.has_service(TTS_DOMAIN, "say"):
         hass.services.async_register(
@@ -42,7 +116,8 @@ async def async_setup(hass: HomeAssistant, config: dict):
             "say",
             handle_tts,
             schema=vol.Schema({
-                vol.Required(CONF_DEVICE_ID): cv.string,
+                vol.Optional(ATTR_DEVICE_ID): vol.Any(cv.string, [cv.string]),
+                vol.Optional(ATTR_ENTITY_ID): vol.Any(cv.entity_id, [cv.entity_id]),
                 vol.Exclusive("message", "content"): cv.string,
                 vol.Exclusive("text", "content"): cv.string,
             }),
@@ -115,14 +190,15 @@ async def async_migrate_entry(
 #Gọi khi người dùng thêm 1 cấu hình integration
 async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = entry.data
+    entry.runtime_data = build_runtime_data(hass, entry)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
-    device_id = entry.data.get(CONF_DEVICE_ID)
-    if device_id and entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST:
-        agent = VBotConversationAgent(hass, entry, device_id)
+    runtime = entry.runtime_data
+    if runtime.device_id and runtime.device_type == DEVICE_TYPE_HOST:
+        await async_setup_event_bridge(hass, entry)
+        agent = VBotConversationAgent(hass, entry, runtime)
         conversation.async_set_agent(hass, entry, agent)
     await hass.config_entries.async_forward_entry_setups(
-        entry, platforms_for_device(entry.data)
+        entry, platforms_for_device({CONF_DEVICE_TYPE: runtime.device_type})
     )
     return True
 
@@ -133,10 +209,12 @@ async def _async_reload_entry(hass: HomeAssistant, entry: config_entries.ConfigE
 
 #Gỡ bỏ khi người dùng xóa cấu hình
 async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
-    await hass.config_entries.async_unload_platforms(
-        entry, platforms_for_device(entry.data)
+    runtime = entry.runtime_data
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        entry, platforms_for_device({CONF_DEVICE_TYPE: runtime.device_type})
     )
-    hass.data[DOMAIN].pop(entry.entry_id, None)
-    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST:
+    if not unload_ok:
+        return False
+    if runtime.device_type == DEVICE_TYPE_HOST:
         conversation.async_unset_agent(hass, entry)
     return True

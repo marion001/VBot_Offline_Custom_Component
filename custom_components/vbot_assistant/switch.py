@@ -13,16 +13,17 @@ import aiohttp
 import json
 import base64
 import asyncio
+from dataclasses import dataclass
 
 from homeassistant.core import HomeAssistant
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url
+from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url, vbot_host_from_url
 from .availability import MQTTAvailabilityMixin
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,22 +31,57 @@ _LOGGER = logging.getLogger(__name__)
 #Thời gian mỗi lần kiểm tra cập nhật VBot mới (Phút)
 VBOT_UPDATE_INTERVAL_MINUTES = 720 #720 = 12 tiếng
 
+
+@dataclass(frozen=True, kw_only=True)
+class VBotSwitchEntityDescription(SwitchEntityDescription):
+    """Describe one MQTT-backed VBot switch."""
+
+    state_topic: str
+    command_topic: str
+    payload_on: str = "ON"
+    payload_off: str = "OFF"
+    state_on: str = "ON"
+    state_off: str = "OFF"
+    optimistic: bool = False
+    qos: int = 1
+    retain: bool = True
+
+
+def _switch_description(config: dict) -> VBotSwitchEntityDescription:
+    """Convert legacy switch configuration without changing its identity."""
+    state_topic = config["state_topic"]
+    return VBotSwitchEntityDescription(
+        key=state_topic,
+        name=config["name"],
+        icon=config.get("icon", "mdi:dip-switch"),
+        state_topic=state_topic,
+        command_topic=config["command_topic"],
+        payload_on=config["payload_on"],
+        payload_off=config["payload_off"],
+        state_on=config["state_on"],
+        state_off=config["state_off"],
+        optimistic=config["optimistic"],
+        qos=config["qos"],
+        retain=config["retain"],
+    )
+
 class MQTTSwitch(MQTTAvailabilityMixin, SwitchEntity):
-    def __init__(self, hass, name, state_topic, command_topic, payload_on, payload_off, state_on, state_off, optimistic, qos, retain, icon=None, device=None):
+    def __init__(self, hass, device, description: VBotSwitchEntityDescription):
         self._hass = hass
-        self._name = name
         self._device = device
-        self._attr_unique_id = f"{device.lower()}_{state_topic.replace('/', '_')}_switch"
+        self.entity_description = description
+        self._attr_name = description.name
+        self._attr_unique_id = f"{device.lower()}_{description.state_topic.replace('/', '_')}_switch"
         self._attr_device_class = "switch"
-        self._attr_icon = icon or "mdi:dip-switch"
-        self._state_topic = state_topic
-        self._command_topic = command_topic
-        self._payload_on = payload_on
-        self._payload_off = payload_off
-        self._state_on = state_on
-        self._state_off = state_off
-        self._optimistic = optimistic
-        self._qos = qos
+        self._attr_icon = description.icon
+        self._state_topic = description.state_topic
+        self._command_topic = description.command_topic
+        self._payload_on = description.payload_on
+        self._payload_off = description.payload_off
+        self._state_on = description.state_on
+        self._state_off = description.state_off
+        self._optimistic = description.optimistic
+        self._qos = description.qos
         self._is_on = False
         self._legacy_retained_command_cleared = False
 
@@ -70,23 +106,8 @@ class MQTTSwitch(MQTTAvailabilityMixin, SwitchEntity):
         self.async_on_remove(unsubscribe)
 
     @property
-    def name(self):
-        return self._name
-
-    @property
     def is_on(self):
         return self._is_on
-
-    @property
-    def device_info(self):
-        if not self._device:
-            return None
-        return {
-            "identifiers": {(DOMAIN, self._device)},
-            "name": f"{self._device} VBot Assistant",
-            "manufacturer": "Vũ Tuyển",
-            "model": "VBot Assistant MQTT"
-        }
 
     async def async_turn_on(self, **kwargs):
         # Command topic không được retain, nếu không broker sẽ phát lại lệnh
@@ -124,8 +145,9 @@ class MQTTSwitch(MQTTAvailabilityMixin, SwitchEntity):
 
 #Switch kiểm tra cập nhật RIÊNG cho TỪNG thiết bị Client
 class VBotCheckAllUpdatesSwitch(SwitchEntity, RestoreEntity):
-    def __init__(self, hass, device_id):
+    def __init__(self, hass, entry_id, device_id):
         self.hass = hass
+        self._entry_id = entry_id
         self._device_id = device_id
         self._attr_name = f"Tự động kiểm tra cập nhật VBot ({device_id})"
         self._attr_unique_id = f"{device_id}_check_all_updates"
@@ -133,15 +155,21 @@ class VBotCheckAllUpdatesSwitch(SwitchEntity, RestoreEntity):
         self._is_on = True
         hass.data.setdefault(DOMAIN, {})
         hass.data[DOMAIN].setdefault("device_tasks", {})
-        if device_id not in hass.data[DOMAIN]["device_tasks"]:
-            hass.data[DOMAIN]["device_tasks"][device_id] = None
+        if entry_id not in hass.data[DOMAIN]["device_tasks"]:
+            hass.data[DOMAIN]["device_tasks"][entry_id] = None
 
     async def async_added_to_hass(self):
+        await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state:
             self._is_on = last_state.state == "on"
         if self._is_on:
             await self._start_device_task()
+
+    async def async_will_remove_from_hass(self):
+        """Stop the per-entry timer before a reload or unload."""
+        await self._stop_device_task()
+        await super().async_will_remove_from_hass()
 
     @property
     def is_on(self):
@@ -159,7 +187,7 @@ class VBotCheckAllUpdatesSwitch(SwitchEntity, RestoreEntity):
     @property
     def extra_state_attributes(self):
         device_tasks = self.hass.data[DOMAIN].get("device_tasks", {})
-        task = device_tasks.get(self._device_id)
+        task = device_tasks.get(self._entry_id)
         return {
             "last_check": "N/A",
             "auto_check_enabled": task is not None,
@@ -171,7 +199,9 @@ class VBotCheckAllUpdatesSwitch(SwitchEntity, RestoreEntity):
         self._is_on = True
         self.async_write_ha_state()
         await self._start_device_task()
-        await check_single_device_updates(self.hass, self._device_id)
+        await check_single_device_updates(
+            self.hass, self._device_id, entry_id=self._entry_id
+        )
 
     async def async_turn_off(self, **kwargs):
         self._is_on = False
@@ -181,44 +211,46 @@ class VBotCheckAllUpdatesSwitch(SwitchEntity, RestoreEntity):
     #Khởi động task RIÊNG cho thiết bị này
     async def _start_device_task(self):
         device_tasks = self.hass.data[DOMAIN].get("device_tasks", {})
-        if device_tasks.get(self._device_id):
+        if device_tasks.get(self._entry_id):
             await self._stop_device_task()
         interval = timedelta(minutes=VBOT_UPDATE_INTERVAL_MINUTES)
         async def device_task(_now):
             try:
-                await check_single_device_updates(self.hass, self._device_id)
+                await check_single_device_updates(
+                    self.hass, self._device_id, entry_id=self._entry_id
+                )
             except Exception as e:
                 _LOGGER.error(f"[VBot] Lỗi auto check {self._device_id}: {e}")
         task_handle = async_track_time_interval(self.hass, device_task, interval)
-        device_tasks[self._device_id] = task_handle
+        device_tasks[self._entry_id] = task_handle
         self.hass.data[DOMAIN]["device_tasks"] = device_tasks
 
     #Dừng task RIÊNG của thiết bị này
     async def _stop_device_task(self):
         device_tasks = self.hass.data[DOMAIN].get("device_tasks", {})
-        task_handle = device_tasks.get(self._device_id)
+        task_handle = device_tasks.get(self._entry_id)
         if task_handle:
             task_handle()
-            del device_tasks[self._device_id]
-            self.hass.data[DOMAIN]["device_tasks"] = device_tasks
+        device_tasks.pop(self._entry_id, None)
+        self.hass.data[DOMAIN]["device_tasks"] = device_tasks
 
 #Kiểm tra cập nhật RIÊNG cho 1 thiết bị
-async def check_single_device_updates(hass, device_id):
+async def check_single_device_updates(hass, device_id, entry_id=None):
     try:
         entries = hass.config_entries.async_entries(DOMAIN)
         target_entry = None
         for entry in entries:
-            if entry.data.get(CONF_DEVICE_ID) == device_id:
+            if entry_id and entry.entry_id == entry_id:
+                target_entry = entry
+                break
+            if not entry_id and entry.data.get(CONF_DEVICE_ID) == device_id:
                 target_entry = entry
                 break
         if not target_entry:
             _LOGGER.warning(f"⚠️ [VBot] Không tìm thấy entry cho {device_id}")
             return
-        vbot_url = normalize_vbot_url(target_entry.options.get(
-            VBot_URL_API, target_entry.data.get(VBot_URL_API, "")
-        ), target_entry.data.get(CONF_DEVICE_TYPE))
-        hass.data[DOMAIN][VBot_URL_API] = vbot_url
-        vbot_ip = get_vbot_ip(hass)
+        vbot_url = target_entry.runtime_data.api_url
+        vbot_ip = get_vbot_ip(vbot_url)
         if not vbot_ip:
             _LOGGER.warning(f"⚠️ [VBot] Không lấy được IP cho {device_id}")
             return
@@ -237,7 +269,7 @@ async def check_single_device_updates(hass, device_id):
             notification_id = f"vbot_updates_{device_id.lower()}"
             try:
                 await hass.services.async_call("persistent_notification", "dismiss", {"notification_id": notification_id})
-            except:
+            except Exception:
                 pass
     except Exception as e:
         _LOGGER.error(f"❌ [VBot] Lỗi check_single_device_updates {device_id}: {e}")
@@ -251,12 +283,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     hass.data[DOMAIN].setdefault("check_update_interface", True)
     hass.data[DOMAIN].setdefault("check_update_program", True)
     hass.data[DOMAIN].setdefault("device_tasks", {})
-    cfg = entry.data
-    device = cfg.get(CONF_DEVICE_ID)
-    vbot_url = normalize_vbot_url(
-        entry.options.get(VBot_URL_API, cfg.get(VBot_URL_API, "")),
-        cfg.get(CONF_DEVICE_TYPE),
-    )
+    runtime = entry.runtime_data
+    device = runtime.device_id
     if not device:
         _LOGGER.error("[VBot Assistant MQTT] Không tìm thấy Tên Client trong mục cấu hình")
         return
@@ -665,7 +693,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "icon": "mdi:repeat-variant"
           },
     ]
-    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+    if runtime.device_type == DEVICE_TYPE_ANDROID:
         supported = {
             "conversation_mode", "mic_on_off", "media_player_active",
             "wake_up_in_media_player", "playlist_loop",
@@ -683,7 +711,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "optimistic": False, "qos": 1, "retain": True,
             "icon": "mdi:bluetooth",
         })
-    elif entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32:
+    elif runtime.device_type == DEVICE_TYPE_ESP32:
         supported = {"conversation_mode", "mic_on_off"}
         switches = [
             item for item in switches
@@ -707,25 +735,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "optimistic": False, "qos": 1, "retain": True,
             "icon": "mdi:led-strip-variant",
         })
-    ents = [MQTTSwitch(hass, device=device, **s) for s in switches]
-    hass.data[DOMAIN][VBot_URL_API] = vbot_url
-    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST:
-        ents.append(VBotCheckAllUpdatesSwitch(hass, device))
+    ents = [
+        MQTTSwitch(hass, device, _switch_description(config))
+        for config in switches
+    ]
+    if runtime.device_type == DEVICE_TYPE_HOST:
+        ents.append(VBotCheckAllUpdatesSwitch(hass, entry.entry_id, device))
     async_add_entities(ents, update_before_add=True)
 
 #Lấy chỉ IP từ VBot URL config
-def get_vbot_ip(hass):
+def get_vbot_ip(vbot_url):
     try:
-        vbot_url = hass.data[DOMAIN].get(VBot_URL_API, "")
         if not vbot_url:
             _LOGGER.warning("❌ [VBot] Không có VBot URL trong config")
             return None
-        clean_url = vbot_url.replace('http://', '').replace('https://', '').replace('www.', '')
-        if ':' in clean_url:
-            vbot_ip = clean_url.split(':')[0]
-        else:
-            vbot_ip = clean_url
-        return vbot_ip.strip()
+        return vbot_host_from_url(vbot_url)
     except Exception as e:
         _LOGGER.error(f"❌ [VBot] Lỗi lấy VBot IP: {e}")
         return None
@@ -840,9 +864,11 @@ async def check_all_updates(hass, device_id=None):
             return
         tasks = []
         for entry in entries:
-            current_device_id = entry.data.get(CONF_DEVICE_ID)
+            current_device_id = entry.runtime_data.device_id
             if current_device_id:
-                tasks.append(check_single_device_updates(hass, current_device_id))
+                tasks.append(check_single_device_updates(
+                    hass, current_device_id, entry_id=entry.entry_id
+                ))
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
     except Exception as e:
@@ -918,7 +944,7 @@ def schedule_update_task(hass, type_):
         if callable(old_handle):
             try:
                 old_handle()
-            except:
+            except Exception:
                 pass
     handle = async_track_time_interval(hass, task, interval)
     hass.data[DOMAIN].setdefault("update_tasks", {})

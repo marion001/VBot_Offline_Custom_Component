@@ -27,8 +27,8 @@ async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, 
     pass
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    cfg = entry.data
-    device = cfg.get(CONF_DEVICE_ID)
+    runtime = entry.runtime_data
+    device = runtime.device_id
     if not device:
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
@@ -55,7 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         },
     ]
 
-    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32:
+    if runtime.device_type == DEVICE_TYPE_ESP32:
         sensor_specs = [
             ("Trạng Thái Kết Nối MQTT", "mqtt_connection", "mdi:access-point-network"),
             ("Phiên Bản", "version", "mdi:tag"),
@@ -79,7 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             ),
             "icon": icon,
         } for label, topic, icon in sensor_specs]
-    elif entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+    elif runtime.device_type == DEVICE_TYPE_ANDROID:
         sensor_specs = [
             ("Thiết Bị Bluetooth Đang Kết Nối", "bluetooth_device_name", "mdi:bluetooth-audio"),
             ("Phiên Bản", "version", "mdi:tag"),
@@ -154,11 +154,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         )
     entities = [MQTTSensor(hass, device=device, **s) for s in sensors]
     entities.append(VBotTTSStateSensor(hass, device))
-    device_type = entry.data.get(CONF_DEVICE_TYPE)
-    current_url = normalize_vbot_url(
-        entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, "")),
-        device_type,
-    )
+    current_url = runtime.api_url
     url_source = entry.options.get(
         CONF_URL_SOURCE,
         entry.data.get(CONF_URL_SOURCE, "manual"),

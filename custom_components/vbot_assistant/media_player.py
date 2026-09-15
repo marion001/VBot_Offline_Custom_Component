@@ -20,6 +20,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.core import callback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers import entity_registry as er
 from .const import (
     DOMAIN, CONF_DEVICE_ID, VBot_URL_API,
     CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url,
@@ -32,17 +33,15 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback
 ) -> None:
-    device = entry.data.get(CONF_DEVICE_ID)
+    runtime = entry.runtime_data
+    device = runtime.device_id
     if not device:
         _LOGGER.error("Không tìm thấy device_id trong cấu hình")
         return
 
-    api_url = normalize_vbot_url(
-        entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, "")),
-        entry.data.get(CONF_DEVICE_TYPE),
-    )
-    use_host_default_cover = entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST
-    esp32_profile = entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32
+    api_url = runtime.api_url
+    use_host_default_cover = runtime.device_type == DEVICE_TYPE_HOST
+    esp32_profile = runtime.device_type == DEVICE_TYPE_ESP32
     async_add_entities([
         VBotMediaPlayer(hass, device, api_url, use_host_default_cover, esp32_profile)
     ])
@@ -76,6 +75,8 @@ class VBotMediaPlayer(MediaPlayerEntity):
             | MediaPlayerEntityFeature.NEXT_TRACK
             | MediaPlayerEntityFeature.PREVIOUS_TRACK
         )
+        if use_host_default_cover:
+            self._attr_supported_features |= MediaPlayerEntityFeature.GROUPING
         self._media_title = None
         self._media_url = None
         # Do not make the player unusable while waiting for the retained
@@ -125,6 +126,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
             payload = json.loads(message.payload)
             if isinstance(payload, dict):
                 self._multiroom = payload
+                self._attr_group_members = self._group_entity_ids(payload)
                 if payload.get("has_media"):
                     title = payload.get("title")
                     cover = str(payload.get("cover") or "").strip()
@@ -138,6 +140,118 @@ class VBotMediaPlayer(MediaPlayerEntity):
                 self.async_write_ha_state()
         except (TypeError, ValueError, json.JSONDecodeError) as error:
             _LOGGER.warning("Snapshot Multiroom VBot không hợp lệ: %s", error)
+
+    def _entity_id_for_device(self, device_id: str):
+        registry = er.async_get(self._hass)
+        return registry.async_get_entity_id(
+            "media_player", DOMAIN, f"{device_id.lower()}_media_player"
+        )
+
+    def _group_entity_ids(self, payload):
+        """Map backend speaker IDs to registered Home Assistant entities."""
+        members = []
+        if payload.get("coordinator") and self.entity_id:
+            members.append(self.entity_id)
+        # HA entity unique IDs are based on MQTT Client ID. New backends publish
+        # both forms; speaker_ids remains as a compatibility fallback.
+        speaker_ids = payload.get("speaker_mqtt_ids") or payload.get("speaker_ids") or []
+        for speaker_id in speaker_ids:
+            entity_id = self._entity_id_for_device(str(speaker_id))
+            if entity_id and entity_id not in members:
+                members.append(entity_id)
+        coordinator_name = str(payload.get("coordinator_name") or "").strip()
+        if not members and coordinator_name:
+            entity_id = self._entity_id_for_device(coordinator_name)
+            if entity_id:
+                members.extend([entity_id, self.entity_id])
+        return members or None
+
+    def _devices_from_entity_ids(self, entity_ids):
+        """Resolve media-player entity IDs without depending on their display names."""
+        registry = er.async_get(self._hass)
+        requested = set(entity_ids)
+        devices = []
+        for entry in self._hass.config_entries.async_entries(DOMAIN):
+            runtime = getattr(entry, "runtime_data", None)
+            if not runtime or not runtime.device_id:
+                continue
+            entity_id = registry.async_get_entity_id(
+                "media_player", DOMAIN,
+                f"{runtime.device_id.lower()}_media_player",
+            )
+            if entity_id in requested and runtime.device_id != self._device:
+                devices.append(runtime.device_id.lower())
+        return list(dict.fromkeys(devices))
+
+    def _coordinator_device(self):
+        """Resolve coordinator metadata to the configured MQTT client ID."""
+        coordinator_name = str(
+            self._multiroom.get("coordinator_name") or ""
+        ).strip()
+        coordinator_host = str(
+            self._multiroom.get("coordinator_host") or ""
+        ).strip().lower()
+        for entry in self._hass.config_entries.async_entries(DOMAIN):
+            runtime = getattr(entry, "runtime_data", None)
+            if not runtime:
+                continue
+            if coordinator_name and runtime.device_id.lower() == coordinator_name.lower():
+                return runtime.device_id
+            runtime_host = (urlsplit(runtime.api_url).hostname or "").lower()
+            if coordinator_host and runtime_host == coordinator_host:
+                return runtime.device_id
+        return coordinator_name or None
+
+    async def async_join_players(self, group_members: list[str]) -> None:
+        """Create and start a VBot Multiroom group from HA media players."""
+        remote_speaker_ids = self._devices_from_entity_ids(group_members)
+        if not remote_speaker_ids:
+            requested = {
+                str(entity_id or "").strip()
+                for entity_id in (group_members or [])
+                if str(entity_id or "").strip()
+            }
+            # HA uses join with an empty/self-only member list when the user
+            # reduces a group back to its coordinator. Treat that as unjoin.
+            if not requested or requested == {self.entity_id}:
+                if self._multiroom.get("connected") or self._multiroom.get("coordinator"):
+                    await self.async_unjoin_player()
+                return
+            raise ValueError("Không tìm thấy loa VBot hợp lệ để ghép nhóm")
+        # HA treats this entity as coordinator. Include it in the network
+        # stream because local ALSA passthrough stops while capture is active.
+        speaker_ids = list(dict.fromkeys([
+            self._device.lower(), *remote_speaker_ids
+        ]))
+        payload = {
+            "action": "join",
+            "group_id": f"home_assistant_{self._device.lower()}",
+            "speaker_ids": speaker_ids,
+        }
+        await mqtt.async_publish(
+            self._hass,
+            f"{self._device}/script/multiroom_control/set",
+            json.dumps(payload), qos=1, retain=False,
+        )
+
+    async def async_unjoin_player(self) -> None:
+        """Stop a coordinator group or remove this player from its coordinator."""
+        if self._multiroom.get("coordinator"):
+            target_device = self._device
+            payload = {"action": "stop"}
+        else:
+            target_device = self._coordinator_device()
+            if not target_device:
+                raise ValueError("Không xác định được coordinator Multiroom")
+            payload = {
+                "action": "remove_speakers",
+                "speaker_ids": [self._device.lower()],
+            }
+        await mqtt.async_publish(
+            self._hass,
+            f"{target_device}/script/multiroom_control/set",
+            json.dumps(payload), qos=1, retain=False,
+        )
 
     @callback
     def _handle_availability_message(self, message) -> None:
@@ -369,7 +483,10 @@ class VBotMediaPlayer(MediaPlayerEntity):
             "playlist_loop": getattr(self, "_playlist_loop", False),
             "playlist_id": getattr(self, "_playlist_id", None),
             "playlist_name": getattr(self, "_playlist_name", None),
-            "multiroom_connected": bool(self._multiroom.get("connected")),
+            "multiroom_connected": bool(
+                self._multiroom.get("connected")
+                or self._multiroom.get("coordinator")
+            ),
             "multiroom_group_id": self._multiroom.get("group_id"),
             "multiroom_coordinator": self._multiroom.get("coordinator_name") or self._multiroom.get("coordinator_host"),
             "multiroom_has_media": bool(self._multiroom.get("has_media")),

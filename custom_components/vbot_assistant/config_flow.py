@@ -246,6 +246,107 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data=self._discovered_device,
         )
 
+    async def async_step_reconfigure(self, user_input=None):
+        """Update connection settings without replacing the config entry."""
+        entry = self._get_reconfigure_entry()
+        errors = {}
+        device_id = entry.data.get(CONF_DEVICE_ID, "")
+        device_type = entry.data.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST)
+
+        if user_input is not None:
+            url_api = normalize_vbot_url(user_input[VBot_URL_API], device_type)
+            api_key = str(user_input.get(CONF_API_KEY, "")).strip()
+            auto_update = bool(user_input.get(CONF_AUTO_UPDATE_URL, False))
+            validation_error = await _async_validate_device(
+                self.hass, url_api, device_type, device_id, api_key
+            )
+            if validation_error:
+                errors["base"] = validation_error
+            else:
+                await self.async_set_unique_id(device_id)
+                self._abort_if_unique_id_mismatch()
+                updates = {
+                    VBot_URL_API: url_api,
+                    CONF_API_KEY: api_key,
+                    CONF_AUTO_UPDATE_URL: auto_update,
+                    CONF_URL_SOURCE: (
+                        URL_SOURCE_MDNS if auto_update else URL_SOURCE_MANUAL
+                    ),
+                }
+                return self.async_update_and_abort(
+                    entry,
+                    data_updates=updates,
+                    options={**entry.options, **updates},
+                )
+
+        current_url = entry.options.get(
+            VBot_URL_API, entry.data.get(VBot_URL_API, "")
+        )
+        current_api_key = entry.options.get(
+            CONF_API_KEY, entry.data.get(CONF_API_KEY, "")
+        )
+        current_auto_update = entry.options.get(
+            CONF_AUTO_UPDATE_URL,
+            entry.data.get(CONF_AUTO_UPDATE_URL, False),
+        )
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema({
+                vol.Required(VBot_URL_API, default=current_url): str,
+                vol.Optional(CONF_API_KEY, default=current_api_key): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+                vol.Required(
+                    CONF_AUTO_UPDATE_URL, default=current_auto_update
+                ): bool,
+            }),
+            errors=errors,
+        )
+
+    async def async_step_reauth(self, entry_data):
+        """Start a credential refresh flow."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(self, user_input=None):
+        """Validate and replace an expired or invalid API key."""
+        entry = self._get_reauth_entry()
+        errors = {}
+        device_id = entry.data.get(CONF_DEVICE_ID, "")
+        device_type = entry.data.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST)
+        url_api = normalize_vbot_url(
+            entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, "")),
+            device_type,
+        )
+
+        if user_input is not None:
+            api_key = str(user_input.get(CONF_API_KEY, "")).strip()
+            validation_error = await _async_validate_device(
+                self.hass, url_api, device_type, device_id, api_key
+            )
+            if validation_error:
+                errors["base"] = validation_error
+            else:
+                await self.async_set_unique_id(device_id)
+                self._abort_if_unique_id_mismatch()
+                return self.async_update_and_abort(
+                    entry,
+                    data_updates={CONF_API_KEY: api_key},
+                    options={**entry.options, CONF_API_KEY: api_key},
+                )
+
+        current_api_key = entry.options.get(
+            CONF_API_KEY, entry.data.get(CONF_API_KEY, "")
+        )
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({
+                vol.Optional(CONF_API_KEY, default=current_api_key): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+            }),
+            errors=errors,
+        )
+
     @staticmethod
     def async_get_options_flow(config_entry):
         return VBotOptionsFlowHandler(config_entry)

@@ -22,7 +22,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     pass
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    device = entry.data.get(CONF_DEVICE_ID)
+    runtime = entry.runtime_data
+    device = runtime.device_id
     if not device:
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
@@ -38,7 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "qos": 1,
         },
     ]
-    if entry.data.get(CONF_DEVICE_TYPE) in (DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32):
+    if runtime.device_type in (DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32):
         numbers.append({
             "name": f"Độ Sáng Đèn Led Slide ({device})",
             "state_topic": f"{device}/number/led_brightness/state",

@@ -26,8 +26,8 @@ async def async_setup_platform(hass: HomeAssistant, config: dict, async_add_enti
     pass
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    cfg = entry.data
-    device = cfg.get(CONF_DEVICE_ID)
+    runtime = entry.runtime_data
+    device = runtime.device_id
     if not device:
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
@@ -197,7 +197,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         }
     ]
 
-    if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ESP32:
+    if runtime.device_type == DEVICE_TYPE_ESP32:
         supported_payloads = {
             "STOP", "MEDIA_PLAY_DYNAMIC", "UP", "DOWN",
             "RESTART_VBOT_SERVICE", "RESTART_INTERFACE", "SYNC",
@@ -214,7 +214,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "topic": f"{device}/script/button_control/set",
             "payload": "WAKEUP",
         })
-    elif entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_ANDROID:
+    elif runtime.device_type == DEVICE_TYPE_ANDROID:
         supported_payloads = {
             "PAUSE", "STOP", "RESUME", "MEDIA_PLAY_DYNAMIC",
             "UP", "DOWN", "MIN", "MAX", "LOCAL", "PLAY", "NEXT", "PREV",

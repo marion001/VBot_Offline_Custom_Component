@@ -1,0 +1,79 @@
+{
+    "title": "VBot Assistant",
+    "config": {
+        "flow_title": "{name}",
+        "abort": {
+            "already_configured": "Thiết bị này đã được cấu hình trong Home Assistant."
+        },
+        "step": {
+            "user": {
+                "title": "Liên kết VBot Assistant",
+                "description": "Nhập thông tin kết nối và Tên Client MQTT của VBot.",
+                "data": {
+                    "vbot_api_key": "API Key loa chủ (có thể để trống)",
+                    "device_id": "Tên Client MQTT của VBot",
+                    "vbot_url_api": "URL API VBot",
+                    "device_type": "Loại thiết bị"
+                }
+            },
+            "init": {
+                "title": "Tùy chọn VBot Assistant",
+                "description": "Cập nhật tùy chọn kết nối VBot.",
+                "data": {
+                    "vbot_api_key": "API Key loa chủ (có thể để trống)",
+                    "vbot_url_api": "URL API VBot",
+                    "auto_update_url": "Tự động cập nhật URL API qua mDNS"
+                }
+            },
+            "confirm": {
+                "title": "Tìm thấy thiết bị VBot ({name})",
+                "description": "Tên thiết bị: **{name}**\n\nClient MQTT: **{device}**\n\nURL API: **{host}**\n\nPhiên bản: **{version}**"
+            },
+            "reconfigure": {
+                "title": "Cấu hình lại VBot Assistant",
+                "description": "Cập nhật kết nối mà không xóa thiết bị hoặc entity hiện có.",
+                "data": {
+                    "vbot_api_key": "API Key loa chủ (có thể để trống)",
+                    "vbot_url_api": "URL API VBot",
+                    "auto_update_url": "Tự động cập nhật URL API qua mDNS"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Xác thực lại VBot Assistant",
+                "description": "VBot từ chối API key hiện tại. Hãy nhập API key hợp lệ cho {name}.",
+                "data": {
+                    "vbot_api_key": "API Key loa chủ (có thể để trống nếu xác thực đã tắt)"
+                }
+            }
+        },
+        "error": {
+            "invalid_auth": "API Key không đúng hoặc API loa chủ yêu cầu xác thực.",
+            "cannot_connect": "Không thể kết nối tới URL API đã nhập.",
+            "invalid_device": "API không trả về dữ liệu nhận dạng VBot hợp lệ.",
+            "wrong_device_type": "URL API không khớp với loại thiết bị đã chọn.",
+            "wrong_device_id": "Tên Client MQTT không khớp với cấu hình trên thiết bị.",
+            "device_exists": "Thiết bị này đã được thêm vào Home Assistant.",
+            "no_discovery_data": "Không tìm thấy dữ liệu thiết bị mDNS.",
+            "invalid_discovery_data": "Dữ liệu thiết bị mDNS không hợp lệ.",
+            "discovery_pending": "Thiết bị này đang chờ xác nhận từ phát hiện tự động (mDNS). Bạn có thể chờ hoặc thêm thủ công với thông tin khác."
+        }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "wake_word": "Phát hiện từ đánh thức",
+            "stt_result": "Nhận kết quả giọng nói",
+            "command_received": "Nhận lệnh điều khiển",
+            "tts_started": "TTS bắt đầu",
+            "tts_finished": "TTS hoàn tất",
+            "tts_error": "TTS gặp lỗi",
+            "tts_cancelled": "TTS bị hủy",
+            "bluetooth_connected": "Bluetooth đã kết nối",
+            "bluetooth_disconnected": "Bluetooth đã ngắt kết nối",
+            "multiroom_joined": "Đã tham gia Multiroom",
+            "multiroom_left": "Đã rời Multiroom",
+            "media_started": "Media bắt đầu phát",
+            "media_paused": "Media tạm dừng",
+            "media_stopped": "Media đã dừng"
+        }
+    }
+}

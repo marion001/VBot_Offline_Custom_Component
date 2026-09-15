@@ -2,9 +2,10 @@
 
 from homeassistant.components import mqtt
 from homeassistant.core import callback
+from .entity import VBotEntity
 
 
-class MQTTAvailabilityMixin:
+class MQTTAvailabilityMixin(VBotEntity):
     """Track explicit VBot online/offline messages without blocking startup."""
 
     # Older VBot versions did not publish an availability topic.  Keep entities

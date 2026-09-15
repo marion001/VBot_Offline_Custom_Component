@@ -27,7 +27,7 @@ DEVICE_TYPE_HOST = "vbot_host"
 DEVICE_TYPE_ANDROID = "android_client"
 DEVICE_TYPE_ESP32 = "esp32_client"
 
-HOST_PLATFORMS = ["switch", "number", "sensor", "select", "button", "text", "media_player"]
+HOST_PLATFORMS = ["switch", "number", "sensor", "select", "button", "text", "media_player", "update"]
 ANDROID_PLATFORMS = ["switch", "number", "sensor", "button", "text", "media_player"]
 ESP32_PLATFORMS = ["switch", "number", "sensor", "button", "text", "media_player"]
 
@@ -63,6 +63,17 @@ def normalize_vbot_url(value: str | None, device_type: str | None = None) -> str
         host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
         value = urlunsplit((parsed.scheme, f"{host}:{default_port}", parsed.path, parsed.query, parsed.fragment))
     return value
+
+
+def vbot_host_from_url(value: str | None) -> str | None:
+    """Return the host from one entry's URL without consulting shared state."""
+    try:
+        normalized = normalize_vbot_url(value)
+        if not normalized:
+            return None
+        return urlsplit(normalized).hostname
+    except ValueError:
+        return None
 
 
 def vbot_api_headers(api_key: str | None) -> dict[str, str]:

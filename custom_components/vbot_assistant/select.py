@@ -22,8 +22,8 @@ async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, 
     pass
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    cfg = entry.data
-    device = cfg.get(CONF_DEVICE_ID)
+    runtime = entry.runtime_data
+    device = runtime.device_id
     if not device:
         _LOGGER.error("Không tìm thấy Tên Client trong mục cấu hình")
         return
@@ -43,7 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         ProcessingModeSelect(device),
         ProcessingStreamSelect(device)
     ]
-    if cfg.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_HOST:
+    if runtime.device_type == DEVICE_TYPE_HOST:
         internal_entities.extend([
             VBotDynamicMQTTSelect(
                 hass, device, "PlayList Được Chọn", f"{device}/playlist/state",
