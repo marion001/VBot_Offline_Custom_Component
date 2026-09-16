@@ -25,8 +25,8 @@ class VBotRuntimeData:
 def build_runtime_data(hass: HomeAssistant, entry: ConfigEntry) -> VBotRuntimeData:
     """Build fresh runtime data after setup or an options reload."""
     device_type = entry.data.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST)
-    api_url = normalize_vbot_url(entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, "")), device_type)
-    api_key = str(entry.options.get(CONF_API_KEY, entry.data.get(CONF_API_KEY, ""))).strip()
+    api_url = normalize_vbot_url(entry.data.get(VBot_URL_API, ""), device_type)
+    api_key = str(entry.data.get(CONF_API_KEY, "")).strip()
     return VBotRuntimeData(
         entry_id=entry.entry_id,
         device_id=str(entry.data.get(CONF_DEVICE_ID, "")).strip(),

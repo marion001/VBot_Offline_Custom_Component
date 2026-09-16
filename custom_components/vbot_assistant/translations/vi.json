@@ -18,10 +18,8 @@
             },
             "init": {
                 "title": "Tùy chọn VBot Assistant",
-                "description": "Cập nhật tùy chọn kết nối VBot.",
+                "description": "Thiết lập cách VBot tự động cập nhật địa chỉ API qua mDNS. Dùng Cấu hình lại để thay đổi URL API hoặc API key.",
                 "data": {
-                    "vbot_api_key": "API Key loa chủ (có thể để trống)",
-                    "vbot_url_api": "URL API VBot",
                     "auto_update_url": "Tự động cập nhật URL API qua mDNS"
                 }
             },

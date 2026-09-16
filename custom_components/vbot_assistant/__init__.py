@@ -17,7 +17,7 @@ import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 from .const import (
     DOMAIN, TTS_DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_API_KEY,
-    CONF_DEVICE_TYPE, CONF_AUTO_UPDATE_URL, CONF_URL_SOURCE,
+    CONF_DEVICE_TYPE, CONF_AUTO_UPDATE_URL, CONF_URL_SOURCE, CONF_MDNS_LAST_UPDATE,
     URL_SOURCE_MANUAL, URL_SOURCE_MDNS,
     DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32,
     normalize_vbot_url, platforms_for_device,
@@ -129,13 +129,17 @@ async def async_migrate_entry(
     hass: HomeAssistant, entry: config_entries.ConfigEntry
 ) -> bool:
     """Migrate legacy entries without changing their identity or entities."""
-    if entry.version > 3:
+    if entry.version > 4:
         return False
-    if entry.version == 3:
+    if entry.version == 4:
         return True
 
     data = dict(entry.data)
     options = dict(entry.options)
+    last_mdns_update = options.get(
+        CONF_MDNS_LAST_UPDATE,
+        data.get(CONF_MDNS_LAST_UPDATE),
+    )
     device_type = data.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST)
     if device_type not in (
         DEVICE_TYPE_HOST,
@@ -168,22 +172,23 @@ async def async_migrate_entry(
         CONF_API_KEY: str(
             options.get(CONF_API_KEY, data.get(CONF_API_KEY, ""))
         ).strip(),
-        CONF_AUTO_UPDATE_URL: auto_update,
-        CONF_URL_SOURCE: source,
     })
+    data.pop(CONF_AUTO_UPDATE_URL, None)
+    data.pop(CONF_URL_SOURCE, None)
+    data.pop(CONF_MDNS_LAST_UPDATE, None)
+    options.pop(VBot_URL_API, None)
+    options.pop(CONF_API_KEY, None)
     options.update({
-        VBot_URL_API: normalized_url,
-        CONF_API_KEY: str(
-            options.get(CONF_API_KEY, data.get(CONF_API_KEY, ""))
-        ).strip(),
         CONF_AUTO_UPDATE_URL: auto_update,
         CONF_URL_SOURCE: source,
     })
+    if last_mdns_update:
+        options[CONF_MDNS_LAST_UPDATE] = last_mdns_update
     hass.config_entries.async_update_entry(
         entry,
         data=data,
         options=options,
-        version=3,
+        version=4,
     )
     return True
 

@@ -9,7 +9,8 @@ Mail: VBot.Assistant@gmail.com
 import logging
 import json
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
+import posixpath
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -365,7 +366,10 @@ class VBotMediaPlayer(MediaPlayerEntity):
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         self._media_url = media_id
-        self._media_title = media_id.split("/")[-1]
+        metadata = kwargs.get("metadata") or {}
+        supplied_title = kwargs.get("title") or metadata.get("title") or metadata.get("name")
+        media_path = unquote(urlsplit(media_id).path)
+        self._media_title = str(supplied_title or posixpath.basename(media_path) or media_id)
         self._attr_state = MediaPlayerState.PLAYING
 
         #_LOGGER.info("Yêu cầu phát media:")
@@ -378,7 +382,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
             "media_link": self._media_url,
             "media_name": self._media_title,
             "media_player_source": "MQTT",
-            "media_cover": kwargs.get("media_image_url", "") or (kwargs.get("metadata") or {}).get("thumbnail", "")
+            "media_cover": kwargs.get("media_image_url", "") or metadata.get("thumbnail", "")
         }
 
         await mqtt.async_publish(

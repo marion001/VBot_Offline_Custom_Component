@@ -3,68 +3,61 @@
     "config": {
         "flow_title": "{name}",
         "abort": {
-            "discovered": "Đã phát hiện thiết bị VBot trong mạng. Bạn có thể thêm thiết bị từ trang Tích hợp.",
-            "already_configured": "Thiết bị này đã được cấu hình trong Home Assistant."
+            "discovered": "A VBot device was discovered on the network. You can add it from the Integrations page.",
+            "already_configured": "This device is already configured in Home Assistant."
         },
         "step": {
             "user": {
-                "title": "Liên kết VBot Assistant",
-                "description": "Nhập Tên Client MQTT đã được cấu hình trên loa VBot",
+                "title": "Connect VBot Assistant",
+                "description": "Enter the connection details and the MQTT Client Name configured on VBot.",
                 "data": {
-                    "vbot_api_key": "API Key loa chủ (VBot-API-Key, có thể để trống)",
-                    "device_id": "Tên Client MQTT của loa VBot",
-                    "vbot_url_api": "URL API (loa chủ :5002, Phicomm R1 :8081, ESP32 không cần port)",
-                    "device_type": "Loại thiết bị",
-                    "vbot_processing_mode": "Chọn luồng xử lý dữ liệu của trợ lý Assist"
+                    "vbot_api_key": "Host API key (optional when authentication is disabled)",
+                    "device_id": "VBot MQTT Client Name",
+                    "vbot_url_api": "VBot API URL",
+                    "device_type": "Device type"
                 },
                 "data_description": {
-                    "vbot_api_key": "Trong giao diện Cấu Hình Config WebUI hoặc file Config.json trên loa chủ, kiểm tra api → auth → active. Nếu đang là false thì không cần nhập VBot-API-Key. Sau khi đổi thành true, hãy nhập giá trị tại api → auth → api_key vào đây."
+                    "vbot_api_key": "Check api → auth → active in the VBot WebUI configuration or Config.json. Leave this blank when authentication is disabled; otherwise enter api → auth → api_key."
                 }
             },
             "init": {
-                "title": "Cấu hình lại VBot Assistant",
-                "description": "Thay đổi thông tin API hoặc chế độ xử lý cho trợ lý VBot",
+                "title": "VBot Assistant options",
+                "description": "Configure automatic API address updates through mDNS. Use Reconfigure to change the API URL or API key.",
                 "data": {
-                    "vbot_api_key": "API Key loa chủ (VBot-API-Key, có thể để trống)",
-                    "vbot_url_api": "URL API (chấp nhận có/không http:// và dấu / cuối)",
-                    "auto_update_url": "Tự động cập nhật URL API qua mDNS",
-                    "vbot_processing_mode": "Chọn luồng xử lý dữ liệu của trợ lý Assist"
-                },
-                "data_description": {
-                    "vbot_api_key": "Mở giao diện Cấu Hình Config WebUI hoặc file Config.json trên loa chủ và kiểm tra api → auth → active. Khi là false, trường này có thể để trống. Khi đổi thành true, hãy nhập đúng giá trị tại api → auth → api_key."
+                    "auto_update_url": "Automatically update the API URL through mDNS"
                 }
             },
             "confirm": {
-                "title": "Tìm thấy thiết bị VBot ({name})",
-                "description": "- Tên Thiết Bị: **{name}**\n- Tên Client MQTT: **{device}**\n - Địa chỉ IP:API: **{host}**\n- Phiên Bản Chương Trình: **{version}**\n\nBạn có muốn thêm thiết bị này vào Home Assistant không?"
+                "title": "VBot device discovered ({name})",
+                "description": "Device name: **{name}**\n\nMQTT Client Name: **{device}**\n\nAPI URL: **{host}**\n\nProgram version: **{version}**\n\nDo you want to add this device to Home Assistant?"
             },
             "reconfigure": {
-                "title": "Cấu hình lại VBot Assistant",
-                "description": "Cập nhật kết nối mà không xóa thiết bị hoặc entity hiện có.",
+                "title": "Reconfigure VBot Assistant",
+                "description": "Update the connection without removing the existing device or entities.",
                 "data": {
-                    "vbot_api_key": "API Key loa chủ (có thể để trống)",
-                    "vbot_url_api": "URL API VBot",
-                    "auto_update_url": "Tự động cập nhật URL API qua mDNS"
+                    "vbot_api_key": "Host API key (optional when authentication is disabled)",
+                    "vbot_url_api": "VBot API URL",
+                    "auto_update_url": "Automatically update the API URL through mDNS"
                 }
             },
             "reauth_confirm": {
-                "title": "Xác thực lại VBot Assistant",
-                "description": "VBot từ chối API key hiện tại. Hãy nhập API key hợp lệ cho {name}.",
+                "title": "Reauthenticate VBot Assistant",
+                "description": "VBot rejected the current API key. Enter a valid API key for {name}.",
                 "data": {
-                    "vbot_api_key": "API Key loa chủ (có thể để trống nếu xác thực đã tắt)"
+                    "vbot_api_key": "Host API key (optional when authentication is disabled)"
                 }
             }
         },
         "error": {
-            "invalid_auth": "API Key không đúng hoặc API loa chủ yêu cầu xác thực.",
-            "cannot_connect": "Không thể kết nối tới URL API đã nhập.",
-            "invalid_device": "API không trả về dữ liệu nhận dạng VBot hợp lệ.",
-            "wrong_device_type": "URL API không khớp với loại thiết bị đã chọn.",
-            "wrong_device_id": "Tên Client MQTT không khớp với cấu hình trên thiết bị.",
-            "device_exists": "Thiết bị này đã được thêm vào Home Assistant.",
-			"no_discovery_data": "Không tìm thấy dữ liệu thiết bị mDNS.",
-			"invalid_discovery_data": "Dữ liệu thiết bị mDNS không hợp lệ.",
-			"discovery_pending": "Thiết bị này đang chờ xác nhận từ phát hiện tự động (mDNS). Bạn có thể chờ hoặc thêm thủ công với thông tin khác."
+            "invalid_auth": "The API key is invalid or the host API requires authentication.",
+            "cannot_connect": "Unable to connect to the specified API URL.",
+            "invalid_device": "The API did not return valid VBot identity data.",
+            "wrong_device_type": "The API URL does not match the selected device type.",
+            "wrong_device_id": "The MQTT Client Name does not match the device configuration.",
+            "device_exists": "This device has already been added to Home Assistant.",
+            "no_discovery_data": "No mDNS device data was found.",
+            "invalid_discovery_data": "The mDNS device data is invalid.",
+            "discovery_pending": "This device is awaiting confirmation from mDNS discovery. You can wait or add it manually with different details."
         }
     },
     "device_automation": {

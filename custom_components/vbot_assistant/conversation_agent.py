@@ -11,6 +11,8 @@ import asyncio
 import aiohttp
 from homeassistant.components import conversation
 from homeassistant.helpers import intent
+from homeassistant.helpers import entity_registry as er
+from .const import DOMAIN
 from .runtime import VBotRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,11 +43,18 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                 response=intent_response,
                 conversation_id=user_input.conversation_id
             )
-        mode_entity_id = f"select.assist_tac_nhan_che_do_xu_ly_{self.device_id.lower()}"
-        stream_entity_id = f"select.assist_tac_nhan_luong_xu_ly_{self.device_id.lower()}"
-        mode_state = self.hass.states.get(mode_entity_id)
+        registry = er.async_get(self.hass)
+        mode_entity_id = registry.async_get_entity_id(
+            "select", DOMAIN,
+            f"{self.device_id.lower()}_assist_processing_mode_select",
+        )
+        stream_entity_id = registry.async_get_entity_id(
+            "select", DOMAIN,
+            f"{self.device_id.lower()}_assist_stream_select",
+        )
+        mode_state = self.hass.states.get(mode_entity_id) if mode_entity_id else None
         processing_mode = mode_state.state if mode_state else "chatbot"
-        stream_state = self.hass.states.get(stream_entity_id)
+        stream_state = self.hass.states.get(stream_entity_id) if stream_entity_id else None
         processing_stream = stream_state.state if stream_state else "api"
         vbot_mode = "chatbot" if "chatbot" in processing_mode else "processing"
         intent_response = intent.IntentResponse(language=user_input.language)

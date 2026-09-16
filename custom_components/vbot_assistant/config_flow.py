@@ -25,6 +25,14 @@ from .const import (
 #import logging
 #_LOGGER = logging.getLogger(__name__)
 
+
+def _connection_free_options(options):
+    """Return behavioral options without duplicated connection credentials."""
+    cleaned = dict(options)
+    cleaned.pop(VBot_URL_API, None)
+    cleaned.pop(CONF_API_KEY, None)
+    return cleaned
+
 async def _async_validate_device(hass, url_api, device_type, device_id, api_key=""):
     """Kiểm tra API và loại thiết bị trước khi lưu URL nhập thủ công."""
     session = async_get_clientsession(hass)
@@ -67,7 +75,7 @@ async def _async_validate_device(hass, url_api, device_type, device_id, api_key=
     return None
 
 class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    VERSION = 3
+    VERSION = 4
 
     def __init__(self):
         self.device_id = None
@@ -110,12 +118,8 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         VBot_URL_API: url_api,
                         CONF_API_KEY: api_key,
                         CONF_DEVICE_TYPE: device_type,
-                        CONF_AUTO_UPDATE_URL: False,
-                        CONF_URL_SOURCE: URL_SOURCE_MANUAL,
                     },
                     options={
-                        VBot_URL_API: url_api,
-                        CONF_API_KEY: api_key,
                         CONF_AUTO_UPDATE_URL: False,
                         CONF_URL_SOURCE: URL_SOURCE_MANUAL,
                     },
@@ -175,18 +179,43 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
             )
             if auto_update:
-                current_url = normalize_vbot_url(
-                    existing_entry.options.get(
-                        VBot_URL_API,
-                        existing_entry.data.get(VBot_URL_API, ""),
-                    ),
-                    existing_entry.data.get(CONF_DEVICE_TYPE, device_type),
+                configured_device_type = existing_entry.data.get(
+                    CONF_DEVICE_TYPE, device_type
                 )
-                if current_url != url_api:
-                    updated_data = {**existing_entry.data, **self._discovered_device}
+                discovered_url = normalize_vbot_url(url_api, configured_device_type)
+                current_url = normalize_vbot_url(
+                    existing_entry.data.get(VBot_URL_API, ""),
+                    configured_device_type,
+                )
+                if current_url != discovered_url:
+                    validation_error = await _async_validate_device(
+                        self.hass,
+                        discovered_url,
+                        configured_device_type,
+                        device_id,
+                        str(existing_entry.data.get(CONF_API_KEY, "")).strip(),
+                    )
+                    if validation_error:
+                        persistent_notification.async_create(
+                            self.hass,
+                            title="VBot không thể tự cập nhật địa chỉ",
+                            message=(
+                                f"Thiết bị **{device_name}** (`{device_id}`) quảng bá địa chỉ "
+                                f"`{discovered_url}`, nhưng xác minh thất bại "
+                                f"(`{validation_error}`). Địa chỉ hiện tại `{current_url}` được giữ nguyên."
+                            ),
+                            notification_id=f"vbot_mdns_validation_failed_{device_id}",
+                        )
+                        return self.async_abort(reason="already_configured")
+                    updated_data = {
+                        **existing_entry.data,
+                        VBot_URL_API: discovered_url,
+                        CONF_DEVICE_TYPE: configured_device_type,
+                        "name": device_name,
+                        "version": device_version,
+                    }
                     updated_options = {
-                        **existing_entry.options,
-                        VBot_URL_API: url_api,
+                        **_connection_free_options(existing_entry.options),
                         CONF_AUTO_UPDATE_URL: True,
                         CONF_URL_SOURCE: URL_SOURCE_MDNS,
                         CONF_MDNS_LAST_UPDATE: discovered_at,
@@ -195,6 +224,10 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         existing_entry,
                         data=updated_data,
                         options=updated_options,
+                    )
+                    persistent_notification.async_dismiss(
+                        self.hass,
+                        notification_id=f"vbot_mdns_validation_failed_{device_id}",
                     )
             return self.async_abort(reason="already_configured")
 
@@ -243,7 +276,19 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         persistent_notification.async_dismiss(self.hass, notification_id=f"vbot_discovered_{device_id}",)
         return self.async_create_entry(
             title=f"{device_name} - {urlsplit(url_api).hostname or url_api} (MQTT: {device_id})",
-            data=self._discovered_device,
+            data={
+                CONF_DEVICE_ID: device_id,
+                VBot_URL_API: url_api,
+                CONF_API_KEY: "",
+                CONF_DEVICE_TYPE: self._discovered_device[CONF_DEVICE_TYPE],
+                "name": device_name,
+                "version": device_version,
+            },
+            options={
+                CONF_AUTO_UPDATE_URL: True,
+                CONF_URL_SOURCE: URL_SOURCE_MDNS,
+                CONF_MDNS_LAST_UPDATE: self._discovered_device[CONF_MDNS_LAST_UPDATE],
+            },
         )
 
     async def async_step_reconfigure(self, user_input=None):
@@ -268,23 +313,19 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 updates = {
                     VBot_URL_API: url_api,
                     CONF_API_KEY: api_key,
-                    CONF_AUTO_UPDATE_URL: auto_update,
-                    CONF_URL_SOURCE: (
-                        URL_SOURCE_MDNS if auto_update else URL_SOURCE_MANUAL
-                    ),
                 }
                 return self.async_update_and_abort(
                     entry,
                     data_updates=updates,
-                    options={**entry.options, **updates},
+                    options={
+                        **_connection_free_options(entry.options),
+                        CONF_AUTO_UPDATE_URL: auto_update,
+                        CONF_URL_SOURCE: URL_SOURCE_MDNS if auto_update else URL_SOURCE_MANUAL,
+                    },
                 )
 
-        current_url = entry.options.get(
-            VBot_URL_API, entry.data.get(VBot_URL_API, "")
-        )
-        current_api_key = entry.options.get(
-            CONF_API_KEY, entry.data.get(CONF_API_KEY, "")
-        )
+        current_url = entry.data.get(VBot_URL_API, "")
+        current_api_key = entry.data.get(CONF_API_KEY, "")
         current_auto_update = entry.options.get(
             CONF_AUTO_UPDATE_URL,
             entry.data.get(CONF_AUTO_UPDATE_URL, False),
@@ -314,7 +355,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         device_id = entry.data.get(CONF_DEVICE_ID, "")
         device_type = entry.data.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST)
         url_api = normalize_vbot_url(
-            entry.options.get(VBot_URL_API, entry.data.get(VBot_URL_API, "")),
+            entry.data.get(VBot_URL_API, ""),
             device_type,
         )
 
@@ -331,12 +372,10 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_update_and_abort(
                     entry,
                     data_updates={CONF_API_KEY: api_key},
-                    options={**entry.options, CONF_API_KEY: api_key},
+                    options=_connection_free_options(entry.options),
                 )
 
-        current_api_key = entry.options.get(
-            CONF_API_KEY, entry.data.get(CONF_API_KEY, "")
-        )
+        current_api_key = entry.data.get(CONF_API_KEY, "")
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=vol.Schema({
@@ -356,39 +395,16 @@ class VBotOptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry):
         self._config_entry = config_entry
     async def async_step_init(self, user_input=None):
-        errors = {}
         if user_input is not None:
             auto_update = bool(user_input.get(CONF_AUTO_UPDATE_URL, False))
-            device_type = self._config_entry.data.get(CONF_DEVICE_TYPE, DEVICE_TYPE_HOST)
-            url_api = normalize_vbot_url(user_input[VBot_URL_API], device_type)
-            api_key = str(user_input.get(CONF_API_KEY, "")).strip()
-            validation_error = await _async_validate_device(
-                self.hass,
-                url_api,
-                device_type,
-                self._config_entry.data.get(CONF_DEVICE_ID, ""),
-                api_key,
+            return self.async_create_entry(
+                title="",
+                data={
+                    **_connection_free_options(self._config_entry.options),
+                    CONF_AUTO_UPDATE_URL: auto_update,
+                    CONF_URL_SOURCE: URL_SOURCE_MDNS if auto_update else URL_SOURCE_MANUAL,
+                },
             )
-            if validation_error:
-                errors["base"] = validation_error
-            else:
-                return self.async_create_entry(
-                    title="",
-                    data={
-                        VBot_URL_API: url_api,
-                        CONF_API_KEY: api_key,
-                        CONF_AUTO_UPDATE_URL: auto_update,
-                        CONF_URL_SOURCE: URL_SOURCE_MDNS if auto_update else URL_SOURCE_MANUAL,
-                    },
-                )
-        current_url = self._config_entry.options.get(
-            VBot_URL_API,
-            self._config_entry.data.get(VBot_URL_API, "192.168.14.113:5002")
-        )
-        current_api_key = self._config_entry.options.get(
-            CONF_API_KEY,
-            self._config_entry.data.get(CONF_API_KEY, ""),
-        )
         current_auto_update = self._config_entry.options.get(
             CONF_AUTO_UPDATE_URL,
             self._config_entry.data.get(
@@ -397,10 +413,6 @@ class VBotOptionsFlowHandler(config_entries.OptionsFlow):
             ),
         )
         schema = vol.Schema({
-            vol.Required(VBot_URL_API, default=current_url): str,
-            vol.Optional(CONF_API_KEY, default=current_api_key): selector.TextSelector(
-                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
-            ),
             vol.Required(CONF_AUTO_UPDATE_URL, default=current_auto_update): bool,
         })
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        return self.async_show_form(step_id="init", data_schema=schema)
