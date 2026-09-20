@@ -18,7 +18,7 @@ from .const import (
     CONF_URL_SOURCE, CONF_MDNS_LAST_UPDATE, URL_SOURCE_MDNS,
     DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, normalize_vbot_url,
 )
-from .availability import MQTTAvailabilityMixin
+from .availability import MQTTAvailabilityMixin, set_vbot_device_online
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,6 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         } for label, topic, icon in sensor_specs]
     elif runtime.device_type == DEVICE_TYPE_ANDROID:
         sensor_specs = [
+            ("Trạng Thái Kết Nối MQTT", "mqtt_connection", "mdi:access-point-network"),
             ("Thiết Bị Bluetooth Đang Kết Nối", "bluetooth_device_name", "mdi:bluetooth-audio"),
             ("Phiên Bản", "version", "mdi:tag"),
             ("Tên Ứng Dụng", "application_name", "mdi:application"),
@@ -103,7 +104,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         sensors = [
             {
                 "name": f"{label} ({device})",
-                "state_topic": f"{device}/sensor/{topic}/state",
+                "state_topic": (
+                    f"{device}/availability"
+                    if topic == "mqtt_connection"
+                    else f"{device}/sensor/{topic}/state"
+                ),
                 "icon": icon,
             }
             for label, topic, icon in sensor_specs
@@ -215,6 +220,20 @@ class MQTTSensor(MQTTAvailabilityMixin, SensorEntity):
         self._vbot_availability_exempt = state_topic.endswith("/availability")
         self._attr_icon = icon or "mdi:tune"
         self._state = None
+        diagnostic_suffixes = (
+            "/availability",
+            "/version/state",
+            "_version/state",
+            "_releaseDate/state",
+            "/wifi_name/state",
+            "/ip_address/state",
+            "/client_name/state",
+            "/mqtt_client_name/state",
+            "/mdns_status/state",
+            "/started_at/state",
+        )
+        if state_topic.endswith(diagnostic_suffixes):
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
@@ -231,6 +250,9 @@ class MQTTSensor(MQTTAvailabilityMixin, SensorEntity):
         if self._state_topic.endswith("/availability"):
             availability = str(payload).strip().lower()
             if availability in {"online", "offline"}:
+                set_vbot_device_online(
+                    self._hass, self._device, availability == "online"
+                )
                 payload = "Đã kết nối" if availability == "online" else "Mất kết nối"
         _LOGGER.debug(f"{self._name} MQTT nhận: {payload}")
         self._state = payload

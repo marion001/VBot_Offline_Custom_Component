@@ -1,7 +1,7 @@
 {
   "name": "VBot Assistant",
   "domain": "vbot_assistant",
-  "homeassistant": "2023.0.0",
+  "homeassistant": "2026.8.0",
   "render_readme": true,
   "country": "VN",
   "codeowners": ["@marion001"]

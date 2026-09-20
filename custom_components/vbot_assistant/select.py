@@ -40,8 +40,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     mqtt_entities = [MQTTSelect(hass, device=device, **s) for s in selects]
     internal_entities = [
-        ProcessingModeSelect(device),
-        ProcessingStreamSelect(device)
+        ProcessingModeSelect(hass, device),
+        ProcessingStreamSelect(hass, device)
     ]
     if runtime.device_type == DEVICE_TYPE_HOST:
         internal_entities.extend([
@@ -180,7 +180,10 @@ class VBotDynamicMQTTSelect(MQTTAvailabilityMixin, SelectEntity):
 
     @property
     def extra_state_attributes(self):
-        return {"selected_id": self.selected_id, "items": dict(self._id_by_option)}
+        # HA already exposes the labels through the select's options attribute.
+        # Keep only the ID consumed by action buttons and avoid serializing a
+        # duplicate mapping on every state write.
+        return {"selected_id": self.selected_id}
 
     @property
     def device_info(self):
@@ -192,8 +195,9 @@ class VBotDynamicMQTTSelect(MQTTAvailabilityMixin, SelectEntity):
         }
 
 #Chế độ cho tác Nhân VBot Assist xử lý
-class ProcessingModeSelect(SelectEntity):
-    def __init__(self, device):
+class ProcessingModeSelect(MQTTAvailabilityMixin, SelectEntity):
+    def __init__(self, hass, device):
+        self._hass = hass
         self._device = device
         self._attr_name = f"Assist Tác Nhân Chế Độ Xử Lý ({device})"
         self._attr_unique_id = f"{device.lower()}_assist_processing_mode_select"
@@ -219,8 +223,9 @@ class ProcessingModeSelect(SelectEntity):
         }
 
 #Lựa Chọn luồng xử lý API hoặc MQTT
-class ProcessingStreamSelect(SelectEntity):
-    def __init__(self, device):
+class ProcessingStreamSelect(MQTTAvailabilityMixin, SelectEntity):
+    def __init__(self, hass, device):
+        self._hass = hass
         self._device = device
         self._attr_name = f"Assist Tác Nhân Luồng Xử Lý ({device})"
         self._attr_unique_id = f"{device.lower()}_assist_stream_select"

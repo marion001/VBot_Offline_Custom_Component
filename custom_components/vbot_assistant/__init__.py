@@ -25,6 +25,8 @@ from .const import (
 from .conversation_agent import VBotConversationAgent
 from .runtime import build_runtime_data
 from .events import async_setup_event_bridge
+from .availability import reset_vbot_device_availability
+from .media_compat import async_check_media_api_compatibility
 
 
 def _as_list(value):
@@ -198,6 +200,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     entry.runtime_data = build_runtime_data(hass, entry)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     runtime = entry.runtime_data
+    reset_vbot_device_availability(hass, runtime.device_id)
     if runtime.device_id and runtime.device_type == DEVICE_TYPE_HOST:
         await async_setup_event_bridge(hass, entry)
         agent = VBotConversationAgent(hass, entry, runtime)
@@ -205,6 +208,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     await hass.config_entries.async_forward_entry_setups(
         entry, platforms_for_device({CONF_DEVICE_TYPE: runtime.device_type})
     )
+    if runtime.device_type == DEVICE_TYPE_HOST:
+        entry.async_create_background_task(
+            hass,
+            async_check_media_api_compatibility(hass, runtime),
+            f"Kiểm tra Media API {runtime.device_id}",
+        )
     return True
 
 
@@ -222,4 +231,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEn
         return False
     if runtime.device_type == DEVICE_TYPE_HOST:
         conversation.async_unset_agent(hass, entry)
+    reset_vbot_device_availability(hass, runtime.device_id)
     return True

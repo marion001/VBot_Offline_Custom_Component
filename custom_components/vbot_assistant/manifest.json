@@ -1,12 +1,10 @@
 {
     "domain": "vbot_assistant",
     "name": "VBot Assistant",
-    "version": "1.8.7",
+    "version": "1.8.30",
     "documentation": "https://github.com/marion001/VBot_Offline_Custom_Component",
     "issue_tracker": "https://github.com/marion001/VBot_Offline_Custom_Component/issues",
-    "requirements": [
-        "aiohttp"
-    ],
+    "requirements": [],
     "dependencies": [
         "conversation",
         "mqtt"
@@ -15,17 +13,8 @@
         "@marion001"
     ],
     "config_flow": true,
-    "conversation": true,
-    "platforms": [
-        "switch",
-        "number",
-        "sensor",
-        "select",
-        "button",
-        "text",
-        "media_player",
-        "update"
-    ],
+    "integration_type": "device",
+    "iot_class": "local_push",
     "zeroconf": [
         "_vbot-assistant._tcp.local."
     ]

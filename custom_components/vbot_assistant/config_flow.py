@@ -314,6 +314,9 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     VBot_URL_API: url_api,
                     CONF_API_KEY: api_key,
                 }
+                # The entry update listener performs exactly one reload.
+                # Using the reload helper as well causes a double reload and is
+                # deprecated by Home Assistant 2026.6+.
                 return self.async_update_and_abort(
                     entry,
                     data_updates=updates,

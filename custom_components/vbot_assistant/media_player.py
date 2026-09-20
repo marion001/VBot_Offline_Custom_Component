@@ -6,8 +6,11 @@ Facebook: https://www.facebook.com/TWFyaW9uMDAx
 Mail: VBot.Assistant@gmail.com
 '''
 
+from __future__ import annotations
+
 import logging
 import json
+from typing import TYPE_CHECKING
 from datetime import datetime, timezone
 from urllib.parse import unquote, urlsplit
 import posixpath
@@ -26,6 +29,10 @@ from .const import (
     DOMAIN, CONF_DEVICE_ID, VBot_URL_API,
     CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url,
 )
+from .availability import MQTTAvailabilityMixin
+
+if TYPE_CHECKING:
+    from homeassistant.components.media_player import BrowseMedia, SearchMedia, SearchMediaQuery
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,10 +51,12 @@ async def async_setup_entry(
     use_host_default_cover = runtime.device_type == DEVICE_TYPE_HOST
     esp32_profile = runtime.device_type == DEVICE_TYPE_ESP32
     async_add_entities([
-        VBotMediaPlayer(hass, device, api_url, use_host_default_cover, esp32_profile)
+        VBotMediaPlayer(
+            hass, device, api_url, use_host_default_cover, esp32_profile, entry.entry_id
+        )
     ])
 
-class VBotMediaPlayer(MediaPlayerEntity):
+class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
     def __init__(
         self,
         hass: HomeAssistant,
@@ -55,9 +64,11 @@ class VBotMediaPlayer(MediaPlayerEntity):
         api_url: str = "",
         use_host_default_cover: bool = False,
         esp32_profile: bool = False,
+        entry_id: str = "",
     ):
         self._hass = hass
         self._device = device
+        self._entry_id = entry_id
         self._attr_name = f"Media Player ({device})"
         self._attr_unique_id = f"{device.lower()}_media_player"
         self._attr_state = MediaPlayerState.IDLE
@@ -77,12 +88,14 @@ class VBotMediaPlayer(MediaPlayerEntity):
             | MediaPlayerEntityFeature.PREVIOUS_TRACK
         )
         if use_host_default_cover:
-            self._attr_supported_features |= MediaPlayerEntityFeature.GROUPING
+            self._attr_supported_features |= (
+                MediaPlayerEntityFeature.GROUPING
+                | MediaPlayerEntityFeature.BROWSE_MEDIA
+                | MediaPlayerEntityFeature.SEARCH_MEDIA
+            )
         self._media_title = None
         self._media_url = None
-        # Do not make the player unusable while waiting for the retained
-        # availability message (and remain compatible with older VBot builds).
-        self._attr_available = True
+        self._attr_available = False
         self._attr_source = None
         self._attr_media_artist = None
         self._attr_media_album_name = None
@@ -108,13 +121,6 @@ class VBotMediaPlayer(MediaPlayerEntity):
             qos=1,
         )
         self.async_on_remove(unsubscribe)
-        unsubscribe_availability = await mqtt.async_subscribe(
-            self._hass,
-            f"{self._device}/availability",
-            self._handle_availability_message,
-            qos=1,
-        )
-        self.async_on_remove(unsubscribe_availability)
         unsubscribe_multiroom = await mqtt.async_subscribe(
             self._hass, f"{self._device}/multiroom/state",
             self._handle_multiroom_message, qos=1,
@@ -255,11 +261,6 @@ class VBotMediaPlayer(MediaPlayerEntity):
         )
 
     @callback
-    def _handle_availability_message(self, message) -> None:
-        self._attr_available = str(message.payload).strip().lower() == "online"
-        self.async_write_ha_state()
-
-    @callback
     def _handle_state_message(self, message) -> None:
         try:
             payload = json.loads(message.payload)
@@ -271,7 +272,10 @@ class VBotMediaPlayer(MediaPlayerEntity):
 
         state = str(payload.get("state", "idle")).lower()
         if state == "unavailable":
-            self._attr_available = False
+            # Media playback state is not MQTT device availability. The VBot
+            # LWT topic is the only source allowed to take every control
+            # offline; otherwise one stale media snapshot disables all entities.
+            self._attr_state = MediaPlayerState.IDLE
             self.async_write_ha_state()
             return
 
@@ -365,8 +369,43 @@ class VBotMediaPlayer(MediaPlayerEntity):
         return self._media_title
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+        from homeassistant.components import media_source
+
+        source_metadata = {}
+        if media_source.is_media_source_id(media_id):
+            from .media_source import media_source_metadata
+
+            source_metadata = media_source_metadata(media_id)
+            if source_metadata.get("action") == "playlist":
+                playlist_id = str(source_metadata.get("playlist_id") or "").strip()
+                if not playlist_id:
+                    raise ValueError("Playlist VBot không có ID hợp lệ")
+                playlist_name = str(source_metadata.get("title") or "Playlist")
+                await mqtt.async_publish(
+                    self._hass,
+                    f"{self._device}/script/playlist_control/set",
+                    json.dumps({"action": "play", "playlist_id": playlist_id}),
+                    qos=1,
+                    retain=False,
+                )
+                self._media_title = playlist_name
+                self._attr_media_playlist = playlist_name
+                self._attr_state = MediaPlayerState.PLAYING
+                self.async_write_ha_state()
+                return
+            play_item = await media_source.async_resolve_media(
+                self.hass,
+                media_id,
+                target_media_player=self.entity_id,
+            )
+            media_type = play_item.mime_type
+            media_id = str(play_item.path) if play_item.path is not None else play_item.url
+            if play_item.path is None and media_id.startswith("/") and not media_id.startswith("//"):
+                from homeassistant.components.media_player.browse_media import async_process_play_media_url
+
+                media_id = async_process_play_media_url(self.hass, media_id)
         self._media_url = media_id
-        metadata = kwargs.get("metadata") or {}
+        metadata = {**source_metadata, **(kwargs.get("metadata") or {})}
         supplied_title = kwargs.get("title") or metadata.get("title") or metadata.get("name")
         media_path = unquote(urlsplit(media_id).path)
         self._media_title = str(supplied_title or posixpath.basename(media_path) or media_id)
@@ -381,7 +420,7 @@ class VBotMediaPlayer(MediaPlayerEntity):
             "action": "play",
             "media_link": self._media_url,
             "media_name": self._media_title,
-            "media_player_source": "MQTT",
+            "media_player_source": metadata.get("source_label") or metadata.get("source") or "MQTT",
             "media_cover": kwargs.get("media_image_url", "") or metadata.get("thumbnail", "")
         }
 
@@ -393,6 +432,27 @@ class VBotMediaPlayer(MediaPlayerEntity):
             retain=False
         )
         self.async_write_ha_state()
+
+    async def async_browse_media(
+        self,
+        media_content_type: str | None = None,
+        media_content_id: str | None = None,
+    ) -> BrowseMedia:
+        """Open this VBot's own branch in Home Assistant's media browser."""
+        from homeassistant.components import media_source
+
+        source_id = media_content_id or f"media-source://{DOMAIN}/{self._entry_id}"
+        return await media_source.async_browse_media(self.hass, source_id)
+
+    async def async_search_media(self, query: SearchMediaQuery) -> SearchMedia:
+        """Search WebUI media providers for this VBot."""
+        from homeassistant.components import media_source
+
+        return await media_source.async_search_media(
+            self.hass,
+            f"media-source://{DOMAIN}/{self._entry_id}",
+            query,
+        )
 
     async def async_media_stop(self):
         #_LOGGER.info("Dừng phát media")

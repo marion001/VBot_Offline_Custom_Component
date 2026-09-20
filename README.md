@@ -2,15 +2,27 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
+Phiên bản hiện tại: `1.8.30`.
+
+Yêu cầu Home Assistant **2026.8.0 trở lên** vì Media Browser Search sử dụng API
+tìm kiếm media mới của Home Assistant.
+
 ## Chức năng
 
 - Media Player: play, pause, resume, stop, next, previous, seek, volume và mute.
 - Đồng bộ tên bài, nguồn phát, nghệ sĩ, album, ảnh bìa, thời lượng và trạng thái online.
 - Điều khiển nhạc nội bộ, playlist, AirPlay và Bluetooth theo khả năng của từng nguồn.
+- Media Browser riêng cho từng VBot: duyệt nhạc local, playlist, radio và tìm
+  kiếm Zing MP3, YouTube, NhacCuaTui, Podcast qua API WebUI hiện có.
 - Phát TTS bằng Text + Button hoặc service `vbot_assistant.say`.
 - Dùng VBot làm Conversation Agent cho Home Assistant Assist.
 - Điều khiển các switch cấu hình VBot, âm lượng, LED và nguồn nội dung.
 - Hiển thị phiên bản chương trình/giao diện VBot và kiểm tra cập nhật.
+- Hiển thị Update Entity trong `/config/updates` với ngày phát hành và phiên bản.
+- Theo dõi MQTT availability; entity điều khiển tự chuyển `unavailable` khi loa
+  hoặc broker mất kết nối và phục hồi sau khi đồng bộ lại trạng thái.
+- Kiểm tra phiên bản/capabilities Media API riêng cho từng loa và cảnh báo thiết
+  bị cần cập nhật mà không tạo notification trùng.
 - Hỗ trợ nhiều loa; mỗi loa được phân biệt bằng MQTT Client Name.
 
 ## Yêu cầu
@@ -19,6 +31,10 @@ Custom component kết nối một hoặc nhiều loa VBot với Home Assistant 
 2. MQTT Broker đã được cấu hình và bật trong `Config.json` của từng loa.
 3. Mỗi loa phải có `mqtt_client_name` riêng, ví dụ `VBot_Phong_Khach`.
 4. API VBot phải truy cập được từ Home Assistant, ví dụ `192.168.1.20:5002`.
+5. Muốn dùng Media Browser, loa chủ phải có bản
+   `html/includes/php_ajax/Media_Player_Search.php` tương thích Media API v2.
+6. Nếu bật `api.auth.active`, API key trong Config Entry phải trùng với
+   `api.auth.api_key` của `Config.json` trên đúng loa đó.
 
 ## Loại thiết bị và URL API
 
@@ -45,7 +61,19 @@ Các entity thuộc nhóm chẩn đoán:
 - `Lần Cập Nhật URL Qua mDNS`
 
 Khi mDNS phát hiện cùng `device_id` ở IP mới, integration cập nhật entry hiện
-có và reload các entity; không tạo thêm thiết bị trùng.
+có và reload các entity; không tạo thêm thiết bị trùng. Trước khi đổi URL,
+integration gọi API địa chỉ mới để xác thực API key, loại thiết bị và
+`mqtt_client_name`. Nếu xác thực thất bại, URL cũ được giữ nguyên.
+
+Thông tin kết nối được thay đổi bằng **Reconfigure/Cấu hình lại**:
+
+- URL API/IP/hostname.
+- API key.
+- Tự động cập nhật URL qua mDNS.
+
+Options chỉ lưu tùy chọn hành vi, không lưu URL hoặc API key. Khi lưu
+Reconfigure thành công, Home Assistant cập nhật Config Entry và reload
+integration mà không làm mất thiết bị/entity hiện có.
 
 ## Cài đặt bằng HACS
 
@@ -64,9 +92,10 @@ http://192.168.1.20:5002
 https://vbot.example.com
 ```
 
-Khi nâng cấp từ phiên bản cũ lên `1.3.1`, Config Entry được migration tự động
-lên phiên bản 2. Entry cũ được giữ ở chế độ URL thủ công để tránh thay đổi địa
-chỉ ngoài ý muốn; không cần xóa và thêm lại integration.
+Khi nâng cấp từ phiên bản cũ, Config Entry được migration tự động lên schema
+version 4. Entry cũ được giữ ở chế độ URL thủ công để tránh thay đổi địa chỉ
+ngoài ý muốn; URL/API key được chuyển về `ConfigEntry.data`, còn tùy chọn hành
+vi nằm trong `ConfigEntry.options`. Không cần xóa và thêm lại integration.
 
 ## Thêm nhiều loa
 
@@ -162,14 +191,246 @@ action:
       media_content_id: "https://example.com/audio.mp3"
 ```
 
+## Media Browser và Media Source
+
+Home Assistant cung cấp Media Source tên **VBot**. Mở:
+
+```text
+Media → VBot → <MQTT Client Name>
+```
+
+Cấu trúc trên mỗi loa chủ:
+
+```text
+VBot_Phong_Khach
+├── Nhạc Local
+├── Playlist
+│   ├── Mặc định
+│   └── <các playlist khác>
+├── Radio
+├── Zing MP3
+├── YouTube
+├── NhacCuaTui
+└── Podcast
+```
+
+### Nhạc Local
+
+Thư mục **Nhạc Local** đọc các file âm thanh từ:
+
+```text
+/home/pi/VBot_Offline/Media/Music_Local
+```
+
+Đường dẫn được giữ là đường dẫn local của VBot, không bị đổi thành URL của
+Home Assistant. Tên bài, ảnh bìa và nguồn phát được gửi cùng payload MQTT.
+
+### Playlist
+
+Mỗi playlist hiển thị các bài để phát riêng lẻ. Mục đầu tiên là:
+
+```text
+▶ Phát toàn bộ — <tên playlist>
+```
+
+Lệnh phát toàn bộ dùng `playlist_id` native của VBot nên tiếp tục hỗ trợ chế
+độ tuần tự/ngẫu nhiên/lặp một bài, loop, Next/Previous và đồng bộ trạng thái.
+
+### Tìm kiếm và cache
+
+Zing MP3, YouTube, NhacCuaTui và Podcast có ô tìm kiếm riêng. WebUI ghi kết
+quả gần nhất vào cache; khi mở lại thư mục nguồn, Home Assistant hiển thị cache
+trước đó mà không cần tìm lại:
+
+| Nguồn | Cache WebUI |
+|---|---|
+| Zing MP3 | `html/includes/cache/ZingMP3.json` |
+| YouTube | `html/includes/cache/Youtube.json` |
+| NhacCuaTui | `html/includes/cache/NhacCuaTui.json` |
+| Podcast | `html/includes/cache/PodCast.json` |
+
+Zing MP3 được resolve lại URL stream khi phát. YouTube gửi URL video chuẩn cho
+bộ resolver sẵn có của VBot, không phụ thuộc PHP/SSH `GetLink_Youtube`. Metadata
+từ kết quả tìm kiếm được giữ xuyên suốt nên tên bài không biến thành hash hoặc
+basename của URL.
+
+### Chọn VBot làm thiết bị phát
+
+Trong Media Browser, chọn bài rồi chọn entity Media Player của VBot, ví dụ:
+
+```text
+Media Player (VBot_Phong_Khach)
+```
+
+VBot cũng phát được URL/Media Source khác của Home Assistant nếu loa truy cập
+được URL đã resolve. Không dùng `localhost` hoặc `127.0.0.1` làm Home Assistant
+internal URL; hãy dùng IP/hostname mà VBot truy cập được.
+
+### API key và đăng nhập WebUI
+
+Đăng nhập WebUI và API Auth là hai lớp riêng:
+
+| Login WebUI | API Auth | Media Browser |
+|---|---:|---|
+| Tắt | Tắt | Hoạt động không cần key |
+| Bật | Tắt | GET media vẫn hoạt động |
+| Tắt | Bật | Cần đúng `VBot-API-Key` |
+| Bật | Bật | Cần đúng `VBot-API-Key` |
+
+Các GET duyệt/tìm kiếm media tuân theo `api.auth`. Các POST thay đổi playlist
+vẫn được bảo vệ bằng đăng nhập/CSRF.
+
+### Media API version và cảnh báo tương thích
+
+Custom kiểm tra nền endpoint:
+
+```text
+/includes/php_ajax/Media_Player_Search.php?Media_Source_Health=1
+```
+
+Media API v2 quảng bá các capability:
+
+```text
+local, playlist, playlist_play_all, radio,
+search, cache, youtube_direct
+```
+
+Nếu một loa dùng PHP cũ hoặc thiếu capability, Home Assistant tạo một persistent
+notification cố định, ví dụ:
+
+```text
+VBot_PhongNgu cần cập nhật Media API
+```
+
+Reload không tạo thông báo trùng. Khi loa tương thích trở lại, notification tự
+được xóa. Loa offline/mất mạng tạm thời không bị kết luận nhầm là cần cập nhật.
+Kết quả kiểm tra cũng có trong Download Diagnostics và System Health.
+
+### Cập nhật PHP Media API trên từng loa
+
+Chép file mới vào đúng từng loa chủ:
+
+```text
+/home/pi/VBot_Offline/html/includes/php_ajax/Media_Player_Search.php
+```
+
+Sau đó:
+
+```bash
+sudo systemctl restart apache2
+```
+
+Kiểm tra API Auth tắt:
+
+```bash
+curl -sS \
+  'http://127.0.0.1/includes/php_ajax/Media_Player_Search.php?Media_Source_Health=1'
+```
+
+Nếu API Auth bật:
+
+```bash
+read -rsp 'VBot API key: ' VBOT_MEDIA_KEY
+curl -sS \
+  -H "VBot-API-Key: $VBOT_MEDIA_KEY" \
+  'http://127.0.0.1/includes/php_ajax/Media_Player_Search.php?Media_Source_Health=1'
+unset VBOT_MEDIA_KEY
+```
+
+Mỗi loa chủ phải được cập nhật riêng; cập nhật `VBot_DEV` không tự cập nhật
+`VBot_PhongNgu`.
+
+## Cập nhật chương trình và WebUI
+
+Mỗi loa chủ có hai Update Entity native trong:
+
+```text
+Cài đặt → Hệ thống → Cập nhật
+```
+
+- `Cập Nhật Chương Trình VBot` đọc `Version.json`.
+- `Cập Nhật Giao Diện VBot` đọc `html/Version.json`.
+
+Ngày phát hành và phiên bản hiển thị cùng nhau:
+
+```text
+20/09/2026 - 1.3.1
+```
+
+Custom subscribe retained MQTT cho cả `version` và `releaseDate` của bản đang
+cài, đồng thời đọc file tương ứng trên GitHub cho bản mới nhất. Nếu
+`releaseDate` khác nhau thì được coi là có bản mới; khi thiếu ngày, `version`
+được dùng làm phương án dự phòng.
+
+Các cách kiểm tra:
+
+- Nhấn button `VBot Check Updates` để kiểm tra ngay.
+- Bật switch `Tự động kiểm tra cập nhật VBot` để kiểm tra định kỳ.
+- Xem trực tiếp hai Update Entity trong `/config/updates`.
+
+Khi thiết bị offline, custom bỏ qua kiểm tra cập nhật để tránh thông báo sai.
+Metadata GitHub được cache dùng chung và kiểm tra lại khi thiết bị online trở
+lại hoặc người dùng yêu cầu kiểm tra thủ công.
+
+## MQTT availability và đồng bộ trạng thái
+
+Mỗi VBot publish retained availability:
+
+```text
+<device>/availability = online | offline
+```
+
+Khi nhận `offline` hoặc Home Assistant mất kết nối MQTT, các entity điều khiển
+chuyển sang `unavailable`. Việc này ngăn người dùng gửi button/switch command
+tới loa không hoạt động. Khi kết nối lại:
+
+1. VBot publish `online`.
+2. Home Assistant gửi yêu cầu `state_sync`.
+3. VBot publish lại toàn bộ retained state.
+4. Entity rời trạng thái `unavailable` sau khi có availability/state hợp lệ.
+
+Khi reload integration, custom xóa trạng thái availability cũ trong bộ nhớ và
+chờ retained `online`, tránh hiển thị online giả từ phiên runtime trước.
+
+Nếu availability đã online nhưng entity vẫn unavailable:
+
+- Kiểm tra log `Đã đồng bộ lại toàn bộ trạng thái lên Home Assistant` trên VBot.
+- Kiểm tra retained topic bằng MQTT Explorer.
+- Kiểm tra broker có ACK và Home Assistant đã subscribe lại sau restart.
+- Không publish command với `retain=true`; custom luôn dùng `retain=false`.
+
 ## TTS
 
 ### Service TTS
 
-Service dùng chung cho mọi loa; `device_id` là MQTT Client Name của loa đích:
+Trong Automation UI, chọn trực tiếp một hoặc nhiều thiết bị VBot ở mục tiêu.
+Ví dụ YAML dùng target Device của Home Assistant:
 
 ```yaml
-service: vbot_assistant.say
+action: vbot_assistant.say
+target:
+  device_id:
+    - 0123456789abcdef0123456789abcdef
+data:
+  message: "Xin chào, đây là thông báo từ Home Assistant"
+```
+
+Cũng có thể target Media Player entity:
+
+```yaml
+action: vbot_assistant.say
+target:
+  entity_id:
+    - media_player.media_player_vbot_phong_khach
+    - media_player.media_player_vbot_phong_ngu
+data:
+  message: "Thông báo phát trên hai loa"
+```
+
+Automation cũ dùng `device_id` là MQTT Client Name vẫn được hỗ trợ:
+
+```yaml
+action: vbot_assistant.say
 data:
   device_id: VBot_Phong_Khach
   message: "Xin chào, đây là thông báo từ Home Assistant"
@@ -178,7 +439,7 @@ data:
 Có thể dùng `text` thay cho `message`:
 
 ```yaml
-service: vbot_assistant.say
+action: vbot_assistant.say
 data:
   device_id: VBot_Phong_Ngu
   text: "Đã đến giờ đi ngủ"
@@ -193,7 +454,7 @@ trigger:
     entity_id: binary_sensor.cua_chinh
     to: "on"
 action:
-  - service: vbot_assistant.say
+  - action: vbot_assistant.say
     data:
       device_id: VBot_Phong_Khach
       message: "Cửa chính đang mở"
@@ -235,7 +496,7 @@ Luồng kết nối hiện dùng API:
 select.assist_tac_nhan_luong_xu_ly_<device> = api
 ```
 
-Khi thay URL API trong Options, integration tự reload agent.
+Khi thay URL API bằng Reconfigure, integration tự reload agent.
 
 ## Nhóm entity khác
 
@@ -291,8 +552,40 @@ không nhận capability mới (seek/mute/next/previous), vào **Cài đặt →
 ### Agent không phản hồi
 
 - Mở URL API VBot từ máy Home Assistant.
-- Kiểm tra port API, firewall và URL trong Options.
+- Kiểm tra port API, firewall và URL trong Reconfigure.
 - Chọn luồng `api` và chế độ `chatbot` hoặc `processing`.
+
+### Media Browser yêu cầu đăng nhập WebUI
+
+- Xác nhận đúng loa trong thông báo/log; Media Browser toàn cục có thể liệt kê
+  nhiều VBot với phiên bản PHP khác nhau.
+- Cập nhật `Media_Player_Search.php` trên chính loa báo lỗi và restart Apache.
+- Nếu `api.auth.active=true`, Reconfigure Config Entry bằng đúng API key.
+- Thử endpoint `Media_Source_Health=1` bằng `curl` như hướng dẫn ở trên.
+
+### Playlist báo “Không có mục nào”
+
+- Kiểm tra `Playlist_Manager=1` có trả `success=true` và mảng `playlists`.
+- Custom từ `1.8.29` không còn che lỗi đăng nhập/PHP cũ thành thư mục rỗng.
+- Kiểm tra file `html/includes/cache/PlayLists.json` và thư mục
+  `html/includes/cache/playlists/` trên đúng loa.
+
+### Tìm kiếm báo `[object Object]`
+
+Nâng cấp custom từ `1.8.25` trở lên. Lỗi provider được chuyển thành văn bản và
+ghi vào log `custom_components.vbot_assistant.media_source`. Với YouTube, kiểm
+tra YouTube Data API v3, quota và giới hạn của Google API key.
+
+### Tên bài hát hiển thị hash hoặc tên file
+
+Nâng cấp custom `1.8.26` trở lên và cập nhật `Api.py`, `Api_MQTT.py` tương ứng
+trên VBot. Các bản mới giữ title/artist/cover/source từ Media Browser qua MQTT.
+
+### Cache nguồn trực tuyến không hiển thị
+
+- Tìm kiếm ít nhất một lần để WebUI tạo/cập nhật cache.
+- Kiểm tra quyền đọc các file cache Zing/YouTube/NhacCuaTui/Podcast.
+- Kiểm tra log Media Source; lỗi xác thực không còn được coi là cache rỗng.
 
 ### Next/Previous không hoạt động
 

@@ -1,5 +1,7 @@
 # VBot Assistant
 
+Yêu cầu Home Assistant **2026.8.0 trở lên** vì integration có Media Browser Search.
+
 Tài liệu sử dụng đầy đủ của integration được duy trì tại
 [`../../README.md`](../../README.md), bao gồm:
 
@@ -10,6 +12,6 @@ Tài liệu sử dụng đầy đủ của integration được duy trì tại
 - ví dụ Lovelace, script và automation;
 - MQTT topics và hướng dẫn xử lý sự cố.
 
-Phiên bản `1.8.7` hỗ trợ loa chủ VBot, Phicomm R1 Client và ESP32/ESP32-S3
+Phiên bản `1.8.8` hỗ trợ loa chủ VBot, Phicomm R1 Client và ESP32/ESP32-S3
 Client; gồm runtime riêng từng Config Entry, Update Entity, Reconfigure/Reauth,
 native Multiroom, Device Trigger và TTS target nhiều thiết bị.

@@ -3,6 +3,7 @@
     "config": {
         "flow_title": "{name}",
         "abort": {
+            "discovered": "Đã phát hiện một thiết bị VBot trong mạng. Bạn có thể thêm thiết bị từ trang Tích hợp.",
             "already_configured": "Thiết bị này đã được cấu hình trong Home Assistant."
         },
         "step": {
@@ -14,6 +15,9 @@
                     "device_id": "Tên Client MQTT của VBot",
                     "vbot_url_api": "URL API VBot",
                     "device_type": "Loại thiết bị"
+                },
+                "data_description": {
+                    "vbot_api_key": "Kiểm tra api → auth → active trong WebUI VBot hoặc Config.json. Để trống khi xác thực bị tắt; nếu bật, hãy nhập api → auth → api_key."
                 }
             },
             "init": {
