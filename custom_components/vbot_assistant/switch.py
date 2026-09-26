@@ -9,11 +9,6 @@ Mail: VBot.Assistant@gmail.com
 import logging
 import voluptuous as vol
 from datetime import timedelta, datetime
-import aiohttp
-import json
-import base64
-import asyncio
-import re
 from dataclasses import dataclass
 
 from homeassistant.core import HomeAssistant
@@ -23,9 +18,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.event import async_call_later
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from .const import DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url, vbot_api_headers, vbot_host_from_url
-from .availability import MQTTAvailabilityMixin, is_vbot_device_online
+from .const import DOMAIN, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST
+from .availability import MQTTAvailabilityMixin
+from .update_service import async_check_device_updates
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -155,10 +150,7 @@ class VBotCheckAllUpdatesSwitch(MQTTAvailabilityMixin, SwitchEntity, RestoreEnti
         self._attr_unique_id = f"{device_id}_check_all_updates"
         self._attr_icon = "mdi:progress-upload"
         self._is_on = True
-        hass.data.setdefault(DOMAIN, {})
-        hass.data[DOMAIN].setdefault("device_tasks", {})
-        if entry_id not in hass.data[DOMAIN]["device_tasks"]:
-            hass.data[DOMAIN]["device_tasks"][entry_id] = None
+        self._cancel_update_timer = None
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
@@ -188,11 +180,9 @@ class VBotCheckAllUpdatesSwitch(MQTTAvailabilityMixin, SwitchEntity, RestoreEnti
 
     @property
     def extra_state_attributes(self):
-        device_tasks = self.hass.data[DOMAIN].get("device_tasks", {})
-        task = device_tasks.get(self._entry_id)
         return {
             "last_check": "N/A",
-            "auto_check_enabled": task is not None,
+            "auto_check_enabled": self._cancel_update_timer is not None,
             "next_check": f"{VBOT_UPDATE_INTERVAL_MINUTES} minutes",
             "device_id": self._device_id
         }
@@ -201,7 +191,7 @@ class VBotCheckAllUpdatesSwitch(MQTTAvailabilityMixin, SwitchEntity, RestoreEnti
         self._is_on = True
         self.async_write_ha_state()
         await self._start_device_task()
-        await check_single_device_updates(
+        await async_check_device_updates(
             self.hass, self._device_id, entry_id=self._entry_id
         )
 
@@ -212,101 +202,36 @@ class VBotCheckAllUpdatesSwitch(MQTTAvailabilityMixin, SwitchEntity, RestoreEnti
 
     #Khởi động task RIÊNG cho thiết bị này
     async def _start_device_task(self):
-        device_tasks = self.hass.data[DOMAIN].get("device_tasks", {})
-        if device_tasks.get(self._entry_id):
+        if self._cancel_update_timer is not None:
             await self._stop_device_task()
         interval = timedelta(minutes=VBOT_UPDATE_INTERVAL_MINUTES)
         async def device_task(_now):
             try:
-                await check_single_device_updates(
+                await async_check_device_updates(
                     self.hass, self._device_id, entry_id=self._entry_id
                 )
             except Exception as e:
                 _LOGGER.error(f"[VBot] Lỗi auto check {self._device_id}: {e}")
-        task_handle = async_track_time_interval(self.hass, device_task, interval)
-        device_tasks[self._entry_id] = task_handle
-        self.hass.data[DOMAIN]["device_tasks"] = device_tasks
+        self._cancel_update_timer = async_track_time_interval(
+            self.hass, device_task, interval
+        )
 
     #Dừng task RIÊNG của thiết bị này
     async def _stop_device_task(self):
-        device_tasks = self.hass.data[DOMAIN].get("device_tasks", {})
-        task_handle = device_tasks.get(self._entry_id)
-        if task_handle:
-            task_handle()
-        device_tasks.pop(self._entry_id, None)
-        self.hass.data[DOMAIN]["device_tasks"] = device_tasks
+        if self._cancel_update_timer is not None:
+            self._cancel_update_timer()
+            self._cancel_update_timer = None
 
-#Kiểm tra cập nhật RIÊNG cho 1 thiết bị
+# Compatibility wrapper retained for existing custom imports.
 async def check_single_device_updates(
     hass, device_id, entry_id=None, notify_when_current=False
 ):
-    try:
-        entries = hass.config_entries.async_entries(DOMAIN)
-        target_entry = None
-        for entry in entries:
-            if entry_id and entry.entry_id == entry_id:
-                target_entry = entry
-                break
-            if not entry_id and entry.data.get(CONF_DEVICE_ID) == device_id:
-                target_entry = entry
-                break
-        if not target_entry:
-            _LOGGER.warning(f"⚠️ [VBot] Không tìm thấy entry cho {device_id}")
-            return
-        if not is_vbot_device_online(hass, device_id):
-            _LOGGER.debug("[VBot] Bỏ qua kiểm tra cập nhật %s vì thiết bị offline", device_id)
-            return
-        vbot_url = target_entry.runtime_data.api_url
-        api_key = target_entry.runtime_data.api_key
-        vbot_ip = get_vbot_ip(vbot_url)
-        if not vbot_ip:
-            _LOGGER.warning(f"⚠️ [VBot] Không lấy được IP cho {device_id}")
-            return
-        interface_result = await check_update_collect(hass, "interface", vbot_ip, "Có Phiên Bản Giao Diện Mới", "html/Version.json", api_key)
-        program_result = await check_update_collect(hass, "program", vbot_ip, "Có Phiên Bản Chương Trình Mới", "Version.json", api_key)
-        check_results = [interface_result, program_result]
-        device_updates = []
-        if (isinstance(interface_result, dict) and interface_result.get('update_available') is True and 'new_version_info' in interface_result and interface_result['new_version_info'].get('success') == True):
-            device_updates.append(interface_result)
-        if (isinstance(program_result, dict) and program_result.get('update_available') is True and 'new_version_info' in program_result and program_result['new_version_info'].get('success') == True):
-            device_updates.append(program_result)
-        #Gửi Thông Báo nếu có Bản Cập Nhật Mới
-        if device_updates:
-            await send_combined_vbot_notification(hass, device_updates, vbot_ip, device_id)
-        else:
-            #Xóa Thông Báo cũ
-            notification_id = f"vbot_updates_{device_id.lower()}"
-            try:
-                await hass.services.async_call("persistent_notification", "dismiss", {"notification_id": notification_id})
-            except Exception:
-                pass
-            if notify_when_current:
-                checks_ok = all(
-                    isinstance(item, dict) and item.get("check_success") is True
-                    for item in check_results
-                )
-                if checks_ok:
-                    title = f"VBot đang sử dụng phiên bản mới nhất ({device_id})"
-                    message = "Đã kiểm tra chương trình VBot và giao diện WebUI; không phát hiện phiên bản khác."
-                else:
-                    title = f"Không kiểm tra được cập nhật VBot ({device_id})"
-                    message = "Không đọc được đầy đủ Version.json local hoặc metadata phiên bản trên GitHub. Hãy xem nhật ký Home Assistant để biết chi tiết."
-                await hass.services.async_call(
-                    "persistent_notification",
-                    "create",
-                    {
-                        "title": title,
-                        "message": message,
-                        "notification_id": notification_id,
-                    },
-                )
-        # Keep native update entities and /config/updates synchronized for
-        # button, switch and periodic checks through this shared function.
-        from .update import async_refresh_vbot_updates
-
-        await async_refresh_vbot_updates(hass, device_id)
-    except Exception as e:
-        _LOGGER.error(f"❌ [VBot] Lỗi check_single_device_updates {device_id}: {e}")
+    return await async_check_device_updates(
+        hass,
+        device_id,
+        entry_id=entry_id,
+        notify_when_current=notify_when_current,
+    )
 
 async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, discovery_info=None):
     _LOGGER.error("VBot Assistant MQTT không hỗ trợ cấu hình YAML. Vui lòng dùng UI (config_entry).")
@@ -314,9 +239,6 @@ async def async_setup_platform(hass: HomeAssistant, config, async_add_entities, 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN].setdefault("check_update_interface", True)
-    hass.data[DOMAIN].setdefault("check_update_program", True)
-    hass.data[DOMAIN].setdefault("device_tasks", {})
     runtime = entry.runtime_data
     device = runtime.device_id
     if not device:
@@ -776,269 +698,3 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if runtime.device_type == DEVICE_TYPE_HOST:
         ents.append(VBotCheckAllUpdatesSwitch(hass, entry.entry_id, device))
     async_add_entities(ents, update_before_add=True)
-
-#Lấy chỉ IP từ VBot URL config
-def get_vbot_ip(vbot_url):
-    try:
-        if not vbot_url:
-            _LOGGER.warning("❌ [VBot] Không có VBot URL trong config")
-            return None
-        return vbot_host_from_url(vbot_url)
-    except Exception as e:
-        _LOGGER.error(f"❌ [VBot] Lỗi lấy VBot IP: {e}")
-        return None
-
-#Gửi notification
-async def send_combined_vbot_notification(hass, updates, vbot_ip, device_id=None):
-    try:
-        if hass is None:
-            return
-        if not updates or not isinstance(updates, list):
-            #_LOGGER.warning("[VBot] Updates không hợp lệ")
-            return
-        updates_count = len(updates)
-        if updates_count == 0:
-            #_LOGGER.warning("[VBot] Không có updates")
-            return
-        title = f"🚀 Có Bản Cập Nhật VBot Mới!: {device_id or 'N/A'}"
-        notification_id = f"vbot_updates_{device_id.lower() if device_id else 'unknown'}"
-        message_lines = [f"🔥 Có {updates_count} Nội Dung Cần Cập Nhật Cho {device_id or 'N/A'}:\n"]
-        valid_updates = []
-        for i, update in enumerate(updates):
-            try:
-                if not isinstance(update, dict) or not update:
-                    continue
-                required_keys = ['display_name', 'current_release_date', 'new_version_info']
-                if not all(key in update for key in required_keys):
-                    continue
-                new_info = update['new_version_info']
-                if not isinstance(new_info, dict) or not new_info.get('success'):
-                    continue
-                required_new_keys = ['version', 'release_date', 'description']
-                if not all(key in new_info for key in required_new_keys):
-                    continue
-                valid_updates.append(update)
-                display_name = update['display_name']
-                current_date = update['current_release_date']
-                version = new_info['version']
-                new_date = new_info['release_date']
-                description = new_info['description']
-                block = f"""🔸 **{display_name}**
-                        📦 **Phiên Bản Mới:** {version}
-                        📅 **Ngày Phát Hành:** {new_date}
-                        📝 **Mô Tả:** {description}
-                        💻 **Phiên Bản Hiện Tại:** {current_date}
-                        """
-                message_lines.append(block)
-            except Exception as e:
-                #_LOGGER.debug(f"[VBot] Bỏ qua update {i}: {e}")
-                continue
-        if not valid_updates:
-            _LOGGER.warning("⚠️ [VBot] Không có updates hợp lệ")
-            return
-        message_lines.extend(["",
-            f"🕐 Thời Gian Kiểm Tra: {datetime.now().strftime('%H:%M, %d/%m/%Y')}",
-            f"🔗 Kiểm tra: http://{vbot_ip}",
-            f"🔗 https://github.com/marion001/VBot_Offline"
-        ])
-        message = "\n".join(message_lines)
-        await hass.services.async_call("persistent_notification", "create", {"title": title, "message": message, "notification_id": notification_id})
-    except Exception as e:
-        _LOGGER.error(f"❌ [VBot] Lỗi send_combined_vbot_notification: {e}", exc_info=True)
-
-#Kiểm tra phiên bản Online
-async def fetch_github_version(session, repo_owner, repo_name, file_path, max_retries=3):
-    for attempt in range(max_retries):
-        try:
-            github_api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
-            headers = {'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'VBot-Update-Checker/1.0'}
-            timeout = aiohttp.ClientTimeout(total=30, connect=10)
-            async with session.get(github_api_url, headers=headers, timeout=timeout) as response:
-                if response.status == 200:
-                    api_data = await response.json()
-                    content_b64 = api_data.get('content', '')
-                    if not content_b64:
-                        _LOGGER.warning(f"⚠️ [VBot] Không có content từ GitHub: {file_path}")
-                        return {'success': False}
-                    try:
-                        content_bytes = base64.b64decode(content_b64)
-                        content_json = json.loads(content_bytes.decode('utf-8'))
-                        return {
-                            'success': True,
-                            'release_date': content_json.get('releaseDate'),
-                            'version': content_json.get('version', ''),
-                            'description': content_json.get('description', ''),
-                            'github_sha': api_data.get('sha', '')
-                        }
-                    except (base64.binascii.Error, json.JSONDecodeError, UnicodeDecodeError) as e:
-                        _LOGGER.error(f"[VBot] Lỗi decode base64 từ API GitHub {file_path}: {e}")
-                        return {'success': False}
-                else:
-                    error_text = await response.text()
-                    _LOGGER.warning(f"⚠️ [VBot] GitHub API {response.status} (lần {attempt + 1}): {error_text}")
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2 ** attempt)
-                        continue
-                    return {'success': False}
-        except asyncio.TimeoutError:
-            _LOGGER.warning(f"⚠️ [VBot] Timeout GitHub API {file_path} (lần {attempt + 1}/{max_retries})")
-        except Exception as e:
-            _LOGGER.error(f"❌ [VBot] Lỗi GitHub API {file_path} (lần {attempt + 1}): {e}")
-        if attempt < max_retries - 1:
-            await asyncio.sleep(2 ** attempt)
-    _LOGGER.error(f"[VBot] ❌ Quá số lần thử lại khi kiểm tra phiên bản cho {file_path}")
-    return {'success': False}
-
-#Kiểm tra TẤT CẢ thiết bị (manual - khi bật switch tổng)
-def _parse_release_date(value):
-    """Parse supported Version.json release date formats."""
-    text = str(value or "").strip()
-    for date_format in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(text, date_format).date()
-        except ValueError:
-            continue
-    return None
-
-
-def _version_key(value):
-    """Return a numeric key for common dotted VBot version strings."""
-    parts = re.findall(r"\d+", str(value or ""))
-    return tuple(int(part) for part in parts) if parts else ()
-
-
-def _is_remote_release_newer(
-    current_release_date,
-    remote_release_date,
-    current_version="",
-    remote_version="",
-):
-    """Treat different release metadata as an available update."""
-    current_date = _parse_release_date(current_release_date)
-    remote_date = _parse_release_date(remote_release_date)
-    if current_date is not None and remote_date is not None:
-        return remote_date != current_date
-
-    current_date_text = str(current_release_date or "").strip()
-    remote_date_text = str(remote_release_date or "").strip()
-    if (
-        current_date_text
-        and remote_date_text
-        and current_date_text != remote_date_text
-    ):
-        return True
-
-    current_key = _version_key(current_version)
-    remote_key = _version_key(remote_version)
-    if current_key and remote_key:
-        return remote_key != current_key
-    return False
-
-
-async def check_all_updates(hass, device_id=None):
-    try:
-        entries = hass.config_entries.async_entries(DOMAIN)
-        if not entries:
-            _LOGGER.error("❌ [VBot] Không tìm thấy config entries")
-            return
-        tasks = []
-        for entry in entries:
-            current_device_id = entry.runtime_data.device_id
-            if current_device_id:
-                tasks.append(check_single_device_updates(
-                    hass, current_device_id, entry_id=entry.entry_id
-                ))
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-    except Exception as e:
-        _LOGGER.error(f"❌ [VBot] Lỗi check_all_updates: {e}")
-
-#Kiểm tra cập nhật và trả về kết quả
-async def check_update_collect(
-    hass, update_type, vbot_ip, display_name, github_path, api_key=""
-):
-    result = {"check_success": False, "update_available": False}
-    try:
-        file_path = "html/" if update_type == 'interface' else ""
-        current_version_url = f"http://{vbot_ip}/includes/php_ajax/Show_file_path.php?read_file_path&file=/home/pi/VBot_Offline/{file_path}Version.json"
-        timeout = aiohttp.ClientTimeout(total=15, connect=10)
-        session = async_get_clientsession(hass)
-        current_release_date = None
-        current_version = None
-        new_version_info = None
-        #Lấy phiên bản hiện tại Local
-        try:
-            async with session.get(
-                current_version_url,
-                headers=vbot_api_headers(api_key),
-                timeout=timeout,
-            ) as response:
-                if response.status == 200:
-                    response_text = await response.text()
-                    try:
-                        response_data = json.loads(response_text)
-                        if response_data.get('success') == True:
-                            data = response_data.get('data')
-                            #Xử lý cả dict VÀ string
-                            if isinstance(data, dict):
-                                current_data = data
-                            elif isinstance(data, str):
-                                current_data = json.loads(data)
-                            else:
-                                _LOGGER.warning(f"⚠️ [VBot] {display_name} - data type không hợp lệ: {type(data)}")
-                                current_data = {}
-                            #Lấy releaseDate từ current_data
-                            current_release_date = current_data.get('releaseDate', '') or current_data.get('release_date', '')
-                            current_version = current_data.get('version', '')
-                    except json.JSONDecodeError as e:
-                        _LOGGER.warning(f"⚠️ [VBot] {display_name} - Lỗi phân tích cú pháp phản hồi JSON: {e}")
-                        _LOGGER.warning(f"[VBot] {display_name} - Response text: {response_text}")
-                else:
-                    _LOGGER.warning(f"⚠️ [VBot] {display_name} - Lỗi HTTP: {response.status}")
-        except Exception as e:
-            _LOGGER.warning(f"⚠️ [VBot] {display_name} - Lỗi lấy phiên bản hiện tại: {e}")
-        #Lấy Phiên Bản Trên GitHub
-        try:
-            new_version_info = await fetch_github_version(session, "marion001", "VBot_Offline", github_path)
-        except Exception as e:
-            _LOGGER.warning(f"⚠️ [VBot] {display_name} - Lỗi lấy GitHub version: {e}")
-            new_version_info = {'success': False}
-        #So sánh phiên bản
-        if (current_release_date and new_version_info and isinstance(new_version_info, dict) and new_version_info.get('success') == True and new_version_info.get('release_date')):
-            result["check_success"] = True
-            new_release_date = new_version_info['release_date']
-            try:
-                if _is_remote_release_newer(
-                    current_release_date,
-                    new_release_date,
-                    current_version,
-                    new_version_info.get('version', ''),
-                ):
-                    result = {'check_success': True, 'update_available': True, 'type': update_type, 'display_name': display_name, 'current_release_date': current_release_date, 'new_version_info': new_version_info}
-            except Exception as compare_e:
-                _LOGGER.warning(f"⚠️ [VBot] {display_name} - Lỗi so sánh phiên bản: {compare_e}")
-        else:
-            _LOGGER.warning(f"ℹ️ [VBot] {display_name} - Không đủ dữ liệu để so sánh:")
-    except Exception as e:
-        _LOGGER.error(f"❌ [VBot] Lỗi check_update_collect {display_name}: {e}", exc_info=True)
-    return result
-
-#Lên lịch kiểm tra cập nhật phiên bản VBot
-def schedule_update_task(hass, type_):
-    interval = timedelta(minutes=VBOT_UPDATE_INTERVAL_MINUTES)
-    async def task(_now):
-        try:
-            await check_all_updates(hass)
-        except Exception as e:
-            _LOGGER.error(f"[VBot] Lỗi auto check: {e}")
-    tasks = hass.data[DOMAIN].get("update_tasks", {})
-    if "all_updates" in tasks:
-        old_handle = tasks["all_updates"]
-        if callable(old_handle):
-            try:
-                old_handle()
-            except Exception:
-                pass
-    handle = async_track_time_interval(hass, task, interval)
-    hass.data[DOMAIN].setdefault("update_tasks", {})
-    hass.data[DOMAIN]["update_tasks"]["all_updates"] = handle

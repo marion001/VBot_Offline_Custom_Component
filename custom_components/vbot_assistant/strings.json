@@ -55,9 +55,31 @@
             "wrong_device_type": "URL API không khớp với loại thiết bị đã chọn.",
             "wrong_device_id": "Tên Client MQTT không khớp với cấu hình trên thiết bị.",
             "device_exists": "Thiết bị này đã được thêm vào Home Assistant.",
+            "device_id_conflict": "MQTT Client ID này trùng với một thiết bị đã cấu hình (không phân biệt chữ hoa/chữ thường). Xem thông báo Home Assistant để biết thiết bị xung đột.",
             "no_discovery_data": "Không tìm thấy dữ liệu thiết bị mDNS.",
             "invalid_discovery_data": "Dữ liệu thiết bị mDNS không hợp lệ.",
             "discovery_pending": "Thiết bị này đang chờ xác nhận từ phát hiện tự động (mDNS). Bạn có thể chờ hoặc thêm thủ công với thông tin khác."
+        }
+    },
+    "entity": {
+        "binary_sensor": {
+            "mqtt_connected": {"name": "Kết nối MQTT"},
+            "microphone": {"name": "Microphone"},
+            "bluetooth_connected": {"name": "Kết nối Bluetooth"}
+        }
+    },
+    "issues": {
+        "duplicate_device_id": {
+            "title": "Trùng MQTT Client ID VBot",
+            "description": "Thiết bị `{device_id}` xung đột với cấu hình `{conflicting_title}` khi so sánh không phân biệt chữ hoa/chữ thường. Hãy đổi MQTT Client ID trên một thiết bị rồi cấu hình lại entry bị lỗi."
+        },
+        "media_api_outdated": {
+            "title": "Media API của VBot cần được cập nhật",
+            "description": "Thiết bị `{device_id}` đang dùng Media API `{current_version}`, yêu cầu tối thiểu `{minimum_version}`. Khả năng còn thiếu: `{missing_capabilities}`. Hãy cập nhật `Media_Player_Search.php` trên WebUI VBot và khởi động lại Apache."
+        },
+        "api_auth_failed": {
+            "title": "VBot từ chối API key",
+            "description": "Thiết bị `{device_id}` trả về lỗi xác thực. Mở cấu hình lại hoặc xác thực lại integration và nhập API key hiện tại của VBot."
         }
     },
     "device_automation": {

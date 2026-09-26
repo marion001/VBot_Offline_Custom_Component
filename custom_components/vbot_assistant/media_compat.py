@@ -10,6 +10,7 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
+from .repairs import update_api_auth_issue, update_media_api_issue
 
 _LOGGER = logging.getLogger(__name__)
 MIN_MEDIA_API_VERSION = 2
@@ -41,6 +42,18 @@ async def async_check_media_api_compatibility(
             {"Media_Source_Health": "1"},
             timeout=8,
         )
+    except aiohttp.ClientResponseError as error:
+        if error.status == 401:
+            update_api_auth_issue(
+                hass, runtime.device_id, authentication_failed=True
+            )
+            entry = hass.config_entries.async_get_entry(runtime.entry_id)
+            if entry is not None:
+                entry.async_start_reauth_if_available(hass)
+        _LOGGER.debug(
+            "Không thể kiểm tra Media API cho %s: %s", runtime.device_id, error
+        )
+        return None
     except (aiohttp.ClientError, asyncio.TimeoutError) as error:
         _LOGGER.debug(
             "Tạm hoãn kiểm tra Media API cho %s vì không kết nối được: %s",
@@ -52,6 +65,7 @@ async def async_check_media_api_compatibility(
         payload = {"success": False, "message": str(error)}
 
     version = 0
+    update_api_auth_issue(hass, runtime.device_id, authentication_failed=False)
     capabilities: set[str] = set()
     if isinstance(payload, dict):
         try:
@@ -75,6 +89,16 @@ async def async_check_media_api_compatibility(
         "minimum_version": MIN_MEDIA_API_VERSION,
         "missing_capabilities": missing,
     }
+    runtime.capabilities.update(capabilities)
+    runtime.media_api_version = version or None
+    update_media_api_issue(
+        hass,
+        runtime.device_id,
+        compatible=compatible,
+        current_version=version or None,
+        minimum_version=MIN_MEDIA_API_VERSION,
+        missing_capabilities=missing,
+    )
 
     if compatible:
         return True

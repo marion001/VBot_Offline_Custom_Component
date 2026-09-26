@@ -55,9 +55,31 @@
             "wrong_device_type": "The API URL does not match the selected device type.",
             "wrong_device_id": "The MQTT Client Name does not match the device configuration.",
             "device_exists": "This device has already been added to Home Assistant.",
+            "device_id_conflict": "This MQTT Client ID conflicts with a configured device (case-insensitive). See the Home Assistant notification for details.",
             "no_discovery_data": "No mDNS device data was found.",
             "invalid_discovery_data": "The mDNS device data is invalid.",
             "discovery_pending": "This device is awaiting confirmation from mDNS discovery. You can wait or add it manually with different details."
+        }
+    },
+    "entity": {
+        "binary_sensor": {
+            "mqtt_connected": {"name": "MQTT connection"},
+            "microphone": {"name": "Microphone"},
+            "bluetooth_connected": {"name": "Bluetooth connection"}
+        }
+    },
+    "issues": {
+        "duplicate_device_id": {
+            "title": "Duplicate VBot MQTT Client ID",
+            "description": "Device `{device_id}` conflicts with configured entry `{conflicting_title}` when compared case-insensitively. Change the MQTT Client ID on one device and reconfigure the failed entry."
+        },
+        "media_api_outdated": {
+            "title": "The VBot Media API must be updated",
+            "description": "Device `{device_id}` reports Media API `{current_version}`; minimum version `{minimum_version}` is required. Missing capabilities: `{missing_capabilities}`. Update `Media_Player_Search.php` in the VBot WebUI and restart Apache."
+        },
+        "api_auth_failed": {
+            "title": "VBot rejected the API key",
+            "description": "Device `{device_id}` returned an authentication error. Reconfigure or reauthenticate the integration using the current VBot API key."
         }
     },
     "device_automation": {

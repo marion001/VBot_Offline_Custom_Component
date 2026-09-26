@@ -7,6 +7,7 @@ Mail: VBot.Assistant@gmail.com
 '''
 
 import asyncio
+import json
 import aiohttp
 import voluptuous as vol
 from datetime import datetime, timezone
@@ -16,12 +17,13 @@ from homeassistant.components import persistent_notification
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import selector
 from .const import (
-    DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_API_KEY, CONF_DEVICE_TYPE,
+    DOMAIN, CONF_DEVICE_ID, VBot_URL_API, CONF_API_KEY, CONF_CAPABILITIES, CONF_DEVICE_TYPE,
     DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32,
     CONF_AUTO_UPDATE_URL, CONF_URL_SOURCE, CONF_MDNS_LAST_UPDATE,
     URL_SOURCE_MANUAL, URL_SOURCE_MDNS,
     normalize_vbot_url, vbot_api_headers,
 )
+from .repairs import create_duplicate_device_issue
 #import logging
 #_LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +34,61 @@ def _connection_free_options(options):
     cleaned.pop(VBot_URL_API, None)
     cleaned.pop(CONF_API_KEY, None)
     return cleaned
+
+
+def _canonical_device_id(device_id: str | None) -> str:
+    """Return the case-insensitive identity used to prevent entity collisions."""
+    return str(device_id or "").strip().casefold()
+
+
+def _parse_capabilities(value) -> list[str]:
+    """Normalize mDNS/API capability advertisements."""
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("["):
+            try:
+                value = json.loads(text)
+            except json.JSONDecodeError:
+                value = text.split(",")
+        else:
+            value = text.split(",")
+    if not isinstance(value, (list, tuple, set)):
+        return []
+    return sorted({str(item).strip() for item in value if str(item).strip()})
+
+
+def _find_device_id_conflict(entries, device_id: str, *, exclude_entry_id=None):
+    """Find a previously configured entry with the same MQTT client identity."""
+    candidate = _canonical_device_id(device_id)
+    if not candidate:
+        return None
+    return next(
+        (
+            entry
+            for entry in entries
+            if entry.entry_id != exclude_entry_id
+            and _canonical_device_id(entry.data.get(CONF_DEVICE_ID)) == candidate
+        ),
+        None,
+    )
+
+
+def _notify_device_id_conflict(hass, requested_id: str, existing_entry) -> None:
+    """Tell the user which existing device prevents a duplicate setup."""
+    existing_id = str(existing_entry.data.get(CONF_DEVICE_ID, "")).strip()
+    persistent_notification.async_create(
+        hass,
+        title="Trùng MQTT Client ID của VBot",
+        message=(
+            f"Không thể thêm thiết bị dùng MQTT Client ID `{requested_id}` vì "
+            f"thiết bị đã cấu hình **{existing_entry.title}** đang dùng ID "
+            f"`{existing_id}`. MQTT Client ID và unique ID của entity được kiểm "
+            "tra không phân biệt chữ hoa/chữ thường. Hãy đổi Client ID trên một "
+            "trong hai thiết bị trước khi kết nối lại."
+        ),
+        notification_id=f"vbot_duplicate_device_id_{_canonical_device_id(requested_id)}",
+    )
+    create_duplicate_device_issue(hass, requested_id, existing_entry.title)
 
 async def _async_validate_device(hass, url_api, device_type, device_id, api_key=""):
     """Kiểm tra API và loại thiết bị trước khi lưu URL nhập thủ công."""
@@ -93,7 +150,13 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 DEVICE_TYPE_ANDROID: "Phicomm R1 Client",
                 DEVICE_TYPE_ESP32: "ESP32 VBot Client",
             }.get(device_type, "VBot Assistant")
-            if not url_api:
+            conflict = _find_device_id_conflict(
+                self._async_current_entries(), self.device_id
+            )
+            if conflict is not None:
+                _notify_device_id_conflict(self.hass, self.device_id, conflict)
+                errors["base"] = "device_id_conflict"
+            elif not url_api:
                 errors["base"] = "cannot_connect"
             else:
                 validation_error = await _async_validate_device(
@@ -102,13 +165,8 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if validation_error:
                     errors["base"] = validation_error
             if not errors:
-                await self.async_set_unique_id(self.device_id)
+                await self.async_set_unique_id(_canonical_device_id(self.device_id))
                 self._abort_if_unique_id_configured()
-            #Kiểm tra trùng thủ công
-            for entry in self._async_current_entries():
-                if entry.data.get(CONF_DEVICE_ID) == self.device_id:
-                    errors["base"] = "device_exists"
-                    break
             if not errors:
                 persistent_notification.async_dismiss(self.hass, notification_id=f"vbot_discovered_{self.device_id}",)
                 return self.async_create_entry(
@@ -145,6 +203,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         device_name = (properties.get("name") or "VBot Assistant").strip()
         device_version = (properties.get("version") or "N/A").strip()
         device_type = (properties.get(CONF_DEVICE_TYPE) or DEVICE_TYPE_HOST).strip()
+        capabilities = _parse_capabilities(properties.get(CONF_CAPABILITIES, []))
         if device_type not in (DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32):
             device_type = DEVICE_TYPE_HOST
         url_api = normalize_vbot_url(properties.get("url_api", ""), device_type)
@@ -158,19 +217,23 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_AUTO_UPDATE_URL: True,
             CONF_URL_SOURCE: URL_SOURCE_MDNS,
             CONF_MDNS_LAST_UPDATE: discovered_at,
+            CONF_CAPABILITIES: capabilities,
             "name": device_name,
             "version": device_version,
         }
-        await self.async_set_unique_id(device_id)
+        await self.async_set_unique_id(_canonical_device_id(device_id))
         existing_entry = next(
             (
                 entry for entry in self._async_current_entries()
-                if entry.unique_id == device_id
-                or entry.data.get(CONF_DEVICE_ID) == device_id
+                if _canonical_device_id(entry.unique_id) == _canonical_device_id(device_id)
+                or _canonical_device_id(entry.data.get(CONF_DEVICE_ID))
+                == _canonical_device_id(device_id)
             ),
             None,
         )
         if existing_entry is not None:
+            if str(existing_entry.data.get(CONF_DEVICE_ID, "")).strip() != device_id:
+                _notify_device_id_conflict(self.hass, device_id, existing_entry)
             auto_update = existing_entry.options.get(
                 CONF_AUTO_UPDATE_URL,
                 existing_entry.data.get(
@@ -211,6 +274,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         **existing_entry.data,
                         VBot_URL_API: discovered_url,
                         CONF_DEVICE_TYPE: configured_device_type,
+                        CONF_CAPABILITIES: capabilities,
                         "name": device_name,
                         "version": device_version,
                     }
@@ -271,7 +335,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         device_name = (self._discovered_device.get("name") or "VBot Assistant").strip()
         #device_name = (getattr(self, "_discovered_device", {}).get("name") or "VBot Assistant").strip()
         device_version = (self._discovered_device.get("version") or "N/A").strip()
-        await self.async_set_unique_id(device_id)
+        await self.async_set_unique_id(_canonical_device_id(device_id))
         self._abort_if_unique_id_configured()
         persistent_notification.async_dismiss(self.hass, notification_id=f"vbot_discovered_{device_id}",)
         return self.async_create_entry(
@@ -281,6 +345,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 VBot_URL_API: url_api,
                 CONF_API_KEY: "",
                 CONF_DEVICE_TYPE: self._discovered_device[CONF_DEVICE_TYPE],
+                CONF_CAPABILITIES: self._discovered_device.get(CONF_CAPABILITIES, []),
                 "name": device_name,
                 "version": device_version,
             },
@@ -308,7 +373,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if validation_error:
                 errors["base"] = validation_error
             else:
-                await self.async_set_unique_id(device_id)
+                await self.async_set_unique_id(entry.unique_id or device_id)
                 self._abort_if_unique_id_mismatch()
                 updates = {
                     VBot_URL_API: url_api,
@@ -370,7 +435,7 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if validation_error:
                 errors["base"] = validation_error
             else:
-                await self.async_set_unique_id(device_id)
+                await self.async_set_unique_id(entry.unique_id or device_id)
                 self._abort_if_unique_id_mismatch()
                 return self.async_update_and_abort(
                     entry,

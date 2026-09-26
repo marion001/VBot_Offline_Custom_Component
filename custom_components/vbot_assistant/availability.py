@@ -2,6 +2,7 @@
 
 import logging
 import inspect
+import json
 import time
 import weakref
 
@@ -18,6 +19,7 @@ _DEVICE_AVAILABILITY_ENTITIES = "device_availability_entities"
 _DEVICE_LAST_SYNC_REQUEST = "device_last_sync_request"
 _DEVICE_AVAILABILITY_CHANGED = "device_availability_changed"
 _DEVICE_LAST_SYNC_REQUEST_WALL = "device_last_sync_request_wall"
+_DEVICE_AVAILABILITY_COORDINATORS = "device_availability_coordinators"
 _SYNC_REQUEST_COOLDOWN = 5.0
 
 
@@ -104,7 +106,216 @@ def get_vbot_availability_diagnostics(hass, device: str) -> dict:
         "registered_entity_count": len(
             domain_data.get(_DEVICE_AVAILABILITY_ENTITIES, {}).get(device, ())
         ),
+        "coordinator_active": device in domain_data.get(
+            _DEVICE_AVAILABILITY_COORDINATORS, {}
+        ),
     }
+
+
+class VBotAvailabilityCoordinator:
+    """Own the three shared MQTT subscriptions for one VBot device."""
+
+    def __init__(self, hass, device: str, runtime=None) -> None:
+        self.hass = hass
+        self.device = device
+        self.runtime = runtime
+        self._subscription_ready = False
+        self._unsubscribers = []
+        self._online_listeners = []
+        self._update_listeners = []
+
+    @callback
+    def async_add_online_listener(self, listener):
+        """Call a listener whenever this device transitions online."""
+        self._online_listeners.append(listener)
+
+        @callback
+        def remove_listener() -> None:
+            if listener in self._online_listeners:
+                self._online_listeners.remove(listener)
+
+        return remove_listener
+
+    @callback
+    def async_add_update_listener(self, listener):
+        """Register one consumer for the shared backend OTA status."""
+        self._update_listeners.append(listener)
+
+        @callback
+        def remove_listener() -> None:
+            if listener in self._update_listeners:
+                self._update_listeners.remove(listener)
+
+        return remove_listener
+
+    async def async_start(self) -> None:
+        """Start the device-level subscriptions exactly once."""
+        availability_topic = f"{self.device}/availability"
+        self._unsubscribers.append(
+            await mqtt.async_subscribe(
+                self.hass,
+                availability_topic,
+                self._handle_availability,
+                qos=1,
+            )
+        )
+        self._unsubscribers.append(
+            await mqtt.async_subscribe(
+                self.hass,
+                f"{self.device}/update/state",
+                self._handle_update_status,
+                qos=1,
+            )
+        )
+        self._unsubscribers.append(
+            await mqtt.async_subscribe(
+                self.hass,
+                f"{self.device}/capabilities",
+                self._handle_capabilities,
+                qos=1,
+            )
+        )
+
+        subscribe_done = getattr(mqtt, "async_on_subscribe_done", None)
+        if callable(subscribe_done):
+            unsubscribe = subscribe_done(
+                self.hass,
+                availability_topic,
+                qos=1,
+                on_subscribe_status=self._handle_subscription_ready,
+            )
+            if inspect.isawaitable(unsubscribe):
+                unsubscribe = await unsubscribe
+            if callable(unsubscribe):
+                self._unsubscribers.append(unsubscribe)
+        else:
+            self._subscription_ready = True
+            self.hass.async_create_task(self._async_request_state_sync())
+
+        subscribe_connection = getattr(
+            mqtt, "async_subscribe_connection_status", None
+        )
+        if callable(subscribe_connection):
+            unsubscribe = subscribe_connection(
+                self.hass, self._handle_mqtt_connection_status
+            )
+            if callable(unsubscribe):
+                self._unsubscribers.append(unsubscribe)
+
+    async def async_shutdown(self) -> None:
+        """Remove subscriptions owned by this coordinator."""
+        while self._unsubscribers:
+            unsubscribe = self._unsubscribers.pop()
+            try:
+                result = unsubscribe()
+                if inspect.isawaitable(result):
+                    await result
+            except Exception as error:  # Defensive cleanup during HA shutdown.
+                _LOGGER.debug(
+                    "Không thể gỡ subscription availability của %s: %s",
+                    self.device,
+                    error,
+                )
+        self._subscription_ready = False
+        self._online_listeners.clear()
+        self._update_listeners.clear()
+
+    @callback
+    def _handle_subscription_ready(self) -> None:
+        self._subscription_ready = True
+        self.hass.async_create_task(self._async_request_state_sync())
+
+    @callback
+    def _handle_mqtt_connection_status(self, connected: bool) -> None:
+        if not connected:
+            self._subscription_ready = False
+            set_vbot_device_online(self.hass, self.device, False)
+            return
+        if self._subscription_ready:
+            self.hass.async_create_task(self._async_request_state_sync())
+
+    @callback
+    def _handle_availability(self, message) -> None:
+        state = _normalize_availability(message.payload)
+        if state is not None:
+            was_online = is_vbot_device_online(self.hass, self.device)
+            set_vbot_device_online(self.hass, self.device, state)
+            if state and not was_online:
+                for listener in tuple(self._online_listeners):
+                    listener()
+
+    @callback
+    def _handle_capabilities(self, message) -> None:
+        """Merge capabilities advertised by the running VBot backend."""
+        if self.runtime is None:
+            return
+        try:
+            payload = json.loads(message.payload)
+            values = payload.get("capabilities", []) if isinstance(payload, dict) else []
+            if isinstance(values, list):
+                self.runtime.capabilities.update(
+                    str(value).strip() for value in values if str(value).strip()
+                )
+        except (json.JSONDecodeError, TypeError, ValueError):
+            _LOGGER.debug("Payload capability không hợp lệ cho %s", self.device)
+
+    @callback
+    def _handle_update_status(self, message) -> None:
+        """Parse OTA state once and fan it out to update entities."""
+        try:
+            payload = json.loads(message.payload)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return
+        if not isinstance(payload, dict):
+            return
+        for listener in tuple(self._update_listeners):
+            listener(payload)
+
+    async def _async_request_state_sync(self) -> None:
+        domain_data = self.hass.data.setdefault(DOMAIN, {})
+        last_requests = domain_data.setdefault(_DEVICE_LAST_SYNC_REQUEST, {})
+        now = time.monotonic()
+        if now - float(last_requests.get(self.device, 0.0)) < _SYNC_REQUEST_COOLDOWN:
+            return
+        last_requests[self.device] = now
+        domain_data.setdefault(_DEVICE_LAST_SYNC_REQUEST_WALL, {})[
+            self.device
+        ] = time.time()
+        try:
+            await mqtt.async_publish(
+                self.hass,
+                f"{self.device}/script/state_sync/set",
+                "sync",
+                qos=1,
+                retain=False,
+            )
+        except Exception as error:
+            _LOGGER.debug(
+                "Chưa thể yêu cầu đồng bộ MQTT cho %s: %s", self.device, error
+            )
+
+
+async def async_setup_vbot_availability(hass, device: str, runtime=None) -> VBotAvailabilityCoordinator:
+    """Create the single availability coordinator for a loaded entry."""
+    coordinators = hass.data.setdefault(DOMAIN, {}).setdefault(
+        _DEVICE_AVAILABILITY_COORDINATORS, {}
+    )
+    if device in coordinators:
+        await coordinators[device].async_shutdown()
+    coordinator = VBotAvailabilityCoordinator(hass, device, runtime)
+    coordinators[device] = coordinator
+    await coordinator.async_start()
+    return coordinator
+
+
+async def async_unload_vbot_availability(hass, device: str) -> None:
+    """Unload and forget one device-level coordinator."""
+    coordinators = hass.data.get(DOMAIN, {}).get(
+        _DEVICE_AVAILABILITY_COORDINATORS, {}
+    )
+    coordinator = coordinators.pop(device, None)
+    if coordinator is not None:
+        await coordinator.async_shutdown()
 
 
 class MQTTAvailabilityMixin(VBotEntity):
@@ -137,7 +348,6 @@ class MQTTAvailabilityMixin(VBotEntity):
             return
 
         self._attr_available = False
-        self._availability_subscription_ready = False
         _register_vbot_entity(self.hass, device, self)
         self.async_on_remove(
             lambda: _unregister_vbot_entity(self.hass, device, self)
@@ -146,102 +356,3 @@ class MQTTAvailabilityMixin(VBotEntity):
         # message before this platform finished adding its entities.
         if is_vbot_device_online(self.hass, device):
             self._attr_available = True
-        availability_topic = f"{device}/availability"
-        unsubscribe = await mqtt.async_subscribe(
-            self.hass,
-            availability_topic,
-            self._handle_vbot_availability,
-            qos=1,
-        )
-        self.async_on_remove(unsubscribe)
-
-        subscribe_done = getattr(mqtt, "async_on_subscribe_done", None)
-        if callable(subscribe_done):
-            unsubscribe_done = subscribe_done(
-                self.hass,
-                availability_topic,
-                qos=1,
-                on_subscribe_status=self._handle_availability_subscription_ready,
-            )
-            # Current HA returns the unsubscribe callback directly. Retain
-            # compatibility in case an older/newer release returns an awaitable.
-            if inspect.isawaitable(unsubscribe_done):
-                unsubscribe_done = await unsubscribe_done
-            self.async_on_remove(unsubscribe_done)
-        else:
-            # Compatibility fallback for HA releases before this helper existed.
-            self._availability_subscription_ready = True
-            self.hass.async_create_task(self._async_request_state_sync())
-
-        subscribe_connection = getattr(mqtt, "async_subscribe_connection_status", None)
-        if callable(subscribe_connection):
-            unsubscribe_connection = subscribe_connection(
-                self.hass, self._handle_mqtt_connection_status
-            )
-            if callable(unsubscribe_connection):
-                self.async_on_remove(unsubscribe_connection)
-
-
-    @callback
-    def _handle_availability_subscription_ready(self) -> None:
-        """Request state only after the broker acknowledged our subscription."""
-        self._availability_subscription_ready = True
-        if is_vbot_device_online(self.hass, self._device):
-            set_vbot_device_online(self.hass, self._device, True)
-        self.hass.async_create_task(self._async_request_state_sync())
-
-    @callback
-    def _handle_mqtt_connection_status(self, connected: bool) -> None:
-        """Make controls unavailable while Home Assistant has no MQTT link."""
-        device = getattr(self, "_device", None)
-        if connected:
-            # A broker reconnect is not an offline signal from this VBot. Keep
-            # any explicit online state already received and request a refresh.
-            if is_vbot_device_online(self.hass, device):
-                set_vbot_device_online(self.hass, device, True)
-            if self._availability_subscription_ready:
-                self.hass.async_create_task(self._async_request_state_sync())
-        else:
-            changed = getattr(self, "_attr_available", None) is not False
-            self._attr_available = False
-            set_vbot_device_online(self.hass, device, False)
-            if changed:
-                self.async_write_ha_state()
-            self._availability_subscription_ready = False
-
-    async def _async_request_state_sync(self) -> None:
-        """Ask one VBot to republish availability and all retained states."""
-        device = getattr(self, "_device", None)
-        if not device:
-            return
-        domain_data = self.hass.data.setdefault(DOMAIN, {})
-        last_requests = domain_data.setdefault(_DEVICE_LAST_SYNC_REQUEST, {})
-        now = time.monotonic()
-        if now - float(last_requests.get(device, 0.0)) < _SYNC_REQUEST_COOLDOWN:
-            return
-        last_requests[device] = now
-        domain_data.setdefault(_DEVICE_LAST_SYNC_REQUEST_WALL, {})[
-            device
-        ] = time.time()
-        try:
-            await mqtt.async_publish(
-                self.hass,
-                f"{device}/script/state_sync/set",
-                "sync",
-                qos=1,
-                retain=False,
-            )
-        except Exception as error:  # MQTT reconnect can race entity setup.
-            _LOGGER.debug("Chưa thể yêu cầu đồng bộ MQTT cho %s: %s", device, error)
-
-    @callback
-    def _handle_vbot_availability(self, message) -> None:
-        """Apply only explicit online/offline messages from this VBot."""
-        state = _normalize_availability(message.payload)
-        if state is None:
-            return
-        changed = getattr(self, "_attr_available", None) != state
-        self._attr_available = state
-        set_vbot_device_online(self.hass, self._device, state)
-        if changed:
-            self.async_write_ha_state()

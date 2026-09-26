@@ -8,10 +8,10 @@ Mail: VBot.Assistant@gmail.com
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.components import conversation
+from homeassistant.components import conversation, persistent_notification
 from homeassistant.components import mqtt
 from homeassistant.const import ATTR_DEVICE_ID, ATTR_ENTITY_ID
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import ConfigEntryError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
@@ -25,8 +25,15 @@ from .const import (
 from .conversation_agent import VBotConversationAgent
 from .runtime import build_runtime_data
 from .events import async_setup_event_bridge
-from .availability import reset_vbot_device_availability
+from .availability import (
+    async_setup_vbot_availability,
+    async_unload_vbot_availability,
+    reset_vbot_device_availability,
+)
 from .media_compat import async_check_media_api_compatibility
+from .repairs import create_duplicate_device_issue, delete_duplicate_device_issue
+
+_LOADED_DEVICE_IDS = "loaded_device_ids"
 
 
 def _as_list(value):
@@ -200,15 +207,73 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     entry.runtime_data = build_runtime_data(hass, entry)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     runtime = entry.runtime_data
+    canonical_device_id = runtime.device_id.casefold()
+    loaded_device_ids = hass.data[DOMAIN].setdefault(_LOADED_DEVICE_IDS, {})
+    conflicting_entry_id = loaded_device_ids.get(canonical_device_id)
+    if conflicting_entry_id and conflicting_entry_id != entry.entry_id:
+        conflicting_entry = hass.config_entries.async_get_entry(
+            conflicting_entry_id
+        )
+        conflicting_title = (
+            conflicting_entry.title if conflicting_entry else conflicting_entry_id
+        )
+        persistent_notification.async_create(
+            hass,
+            title="Trùng MQTT Client ID của VBot",
+            message=(
+                f"Không thể nạp **{entry.title}** vì MQTT Client ID "
+                f"`{runtime.device_id}` trùng với **{conflicting_title}** khi "
+                "so sánh không phân biệt chữ hoa/chữ thường. Hãy đổi Client ID "
+                "trên một thiết bị rồi cấu hình lại entry bị lỗi."
+            ),
+            notification_id=f"vbot_duplicate_device_id_{canonical_device_id}",
+        )
+        create_duplicate_device_issue(
+            hass, runtime.device_id, conflicting_title
+        )
+        raise ConfigEntryError(
+            f"Duplicate VBot MQTT Client ID: {runtime.device_id}"
+        )
+    loaded_device_ids[canonical_device_id] = entry.entry_id
+    delete_duplicate_device_issue(hass, runtime.device_id)
     reset_vbot_device_availability(hass, runtime.device_id)
-    if runtime.device_id and runtime.device_type == DEVICE_TYPE_HOST:
-        await async_setup_event_bridge(hass, entry)
-        agent = VBotConversationAgent(hass, entry, runtime)
-        conversation.async_set_agent(hass, entry, agent)
-    await hass.config_entries.async_forward_entry_setups(
-        entry, platforms_for_device({CONF_DEVICE_TYPE: runtime.device_type})
-    )
+    try:
+        runtime.availability_coordinator = await async_setup_vbot_availability(
+            hass, runtime.device_id, runtime
+        )
+    except Exception:
+        loaded_device_ids.pop(canonical_device_id, None)
+        raise
+    agent_registered = False
+    try:
+        if runtime.device_id and runtime.device_type == DEVICE_TYPE_HOST:
+            await async_setup_event_bridge(hass, entry)
+            agent = VBotConversationAgent(hass, entry, runtime)
+            conversation.async_set_agent(hass, entry, agent)
+            agent_registered = True
+        await hass.config_entries.async_forward_entry_setups(
+            entry, platforms_for_device({CONF_DEVICE_TYPE: runtime.device_type})
+        )
+    except Exception:
+        if agent_registered:
+            conversation.async_unset_agent(hass, entry)
+        await async_unload_vbot_availability(hass, runtime.device_id)
+        reset_vbot_device_availability(hass, runtime.device_id)
+        loaded_device_ids.pop(canonical_device_id, None)
+        raise
     if runtime.device_type == DEVICE_TYPE_HOST:
+        def schedule_media_compatibility_check() -> None:
+            entry.async_create_background_task(
+                hass,
+                async_check_media_api_compatibility(hass, runtime),
+                f"Kiểm tra Media API {runtime.device_id}",
+            )
+
+        entry.async_on_unload(
+            runtime.availability_coordinator.async_add_online_listener(
+                schedule_media_compatibility_check
+            )
+        )
         entry.async_create_background_task(
             hass,
             async_check_media_api_compatibility(hass, runtime),
@@ -229,7 +294,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: config_entries.ConfigEn
     )
     if not unload_ok:
         return False
+    await async_unload_vbot_availability(hass, runtime.device_id)
     if runtime.device_type == DEVICE_TYPE_HOST:
         conversation.async_unset_agent(hass, entry)
     reset_vbot_device_availability(hass, runtime.device_id)
+    loaded_device_ids = hass.data.get(DOMAIN, {}).get(_LOADED_DEVICE_IDS, {})
+    if loaded_device_ids.get(runtime.device_id.casefold()) == entry.entry_id:
+        loaded_device_ids.pop(runtime.device_id.casefold(), None)
     return True

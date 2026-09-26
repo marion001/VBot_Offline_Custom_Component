@@ -332,10 +332,9 @@ class VBotMQTTButton(MQTTAvailabilityMixin, ButtonEntity):
 
     async def async_press(self) -> None:
         if self._command == "check_single_device_updates":
-            # Lazy import avoids coupling platform module initialization.
-            from .switch import check_single_device_updates
+            from .update_service import async_check_device_updates
 
-            await check_single_device_updates(
+            await async_check_device_updates(
                 self._hass,
                 self._device_id or self._device,
                 notify_when_current=True,

@@ -29,6 +29,15 @@ _METADATA_STORE = "update_metadata_store"
 _UPDATE_ENTITIES = "update_entities"
 
 
+def get_update_metadata_store(hass: HomeAssistant):
+    """Return the integration-wide cached GitHub metadata store."""
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    return domain_data.setdefault(
+        _METADATA_STORE,
+        VBotUpdateMetadataStore(async_get_clientsession(hass)),
+    )
+
+
 def _format_release_version(
     release_date: str | None,
     version: str | None,
@@ -98,12 +107,16 @@ async def async_setup_entry(
 ) -> None:
     """Set up update entities for one host entry."""
     runtime = entry.runtime_data
-    session = async_get_clientsession(hass)
-    domain_data = hass.data.setdefault(DOMAIN, {})
-    store = domain_data.setdefault(_METADATA_STORE, VBotUpdateMetadataStore(session))
+    store = get_update_metadata_store(hass)
     async_add_entities(
         [
-            VBotUpdateEntity(hass, store, runtime.device_id, description)
+            VBotUpdateEntity(
+                hass,
+                store,
+                runtime.device_id,
+                description,
+                runtime.availability_coordinator,
+            )
             for description in UPDATE_DESCRIPTIONS
         ],
         update_before_add=True,
@@ -169,11 +182,13 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         store: VBotUpdateMetadataStore,
         device: str,
         description: VBotUpdateDescription,
+        coordinator,
     ) -> None:
         self._hass = hass
         self._store = store
         self._device = device
         self._description = description
+        self._coordinator = coordinator
         self._attr_name = f"{description.name} ({device})"
         self._attr_unique_id = f"{device.lower()}_{description.key}_update"
         self._attr_icon = description.icon
@@ -186,6 +201,7 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         self._installed_release_date = None
         self._attr_release_summary = None
         self._release_notes = None
+        self._update_status = None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -208,6 +224,33 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
             qos=1,
         )
         self.async_on_remove(unsubscribe_release_date)
+        self.async_on_remove(
+            self._coordinator.async_add_update_listener(
+                self._handle_update_status
+            )
+        )
+
+    @callback
+    def _handle_update_status(self, payload) -> None:
+        """Expose backend OTA lifecycle and completion state."""
+        target = str(payload.get("target") or "").strip()
+        if target and target != self._description.key:
+            return
+        self._update_status = payload
+        self._attr_in_progress = bool(payload.get("running"))
+        self.async_write_ha_state()
+
+    @property
+    def extra_state_attributes(self):
+        """Return the latest non-sensitive backend update status."""
+        if not self._update_status:
+            return None
+        return {
+            "update_status": self._update_status.get("status"),
+            "update_message": self._update_status.get("message"),
+            "update_started_at": self._update_status.get("started_at"),
+            "update_finished_at": self._update_status.get("finished_at"),
+        }
 
     def _refresh_installed_version(self) -> None:
         """Expose local release date and version as one HA update value."""
@@ -229,14 +272,6 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         self._installed_release_date = release_date or None
         self._refresh_installed_version()
         self.async_write_ha_state()
-
-    @callback
-    def _handle_vbot_availability(self, message) -> None:
-        """Refresh release metadata when an offline device comes back online."""
-        was_available = self.available
-        super()._handle_vbot_availability(message)
-        if self.available and not was_available:
-            self.hass.async_create_task(self.async_update_ha_state(force_refresh=True))
 
     async def async_update(self) -> None:
         """Fetch the latest release metadata without doing I/O in properties."""
@@ -291,7 +326,10 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         await mqtt.async_publish(
             self._hass,
             f"{self._device}/script/system_update/set",
-            self._description.key,
+            json.dumps({
+                "target": self._description.key,
+                "backup_before_update": bool(backup),
+            }),
             qos=1,
             retain=False,
         )

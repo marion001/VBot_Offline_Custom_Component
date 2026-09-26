@@ -35,6 +35,8 @@ async def async_get_config_entry_diagnostics(
             "device_type": runtime.device_type,
             "api_url": runtime.api_url,
             "api_key_configured": bool(runtime.api_key),
+            "capabilities": sorted(runtime.capabilities),
+            "media_api_version": runtime.media_api_version,
         },
         "mqtt": get_vbot_availability_diagnostics(
             hass, runtime.device_id

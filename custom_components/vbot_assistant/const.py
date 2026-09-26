@@ -21,15 +21,16 @@ CONF_DEVICE_TYPE = "device_type"
 CONF_AUTO_UPDATE_URL = "auto_update_url"
 CONF_URL_SOURCE = "url_source"
 CONF_MDNS_LAST_UPDATE = "mdns_last_update"
+CONF_CAPABILITIES = "capabilities"
 URL_SOURCE_MANUAL = "manual"
 URL_SOURCE_MDNS = "mdns"
 DEVICE_TYPE_HOST = "vbot_host"
 DEVICE_TYPE_ANDROID = "android_client"
 DEVICE_TYPE_ESP32 = "esp32_client"
 
-HOST_PLATFORMS = ["switch", "number", "sensor", "select", "button", "text", "media_player", "update"]
-ANDROID_PLATFORMS = ["switch", "number", "sensor", "button", "text", "media_player"]
-ESP32_PLATFORMS = ["switch", "number", "sensor", "button", "text", "media_player"]
+HOST_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "select", "button", "text", "media_player", "update"]
+ANDROID_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "button", "text", "media_player"]
+ESP32_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "button", "text", "media_player"]
 
 
 def platforms_for_device(data: dict) -> list[str]:

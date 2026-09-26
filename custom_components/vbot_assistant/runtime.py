@@ -1,13 +1,14 @@
 """Per-entry runtime state for VBot Assistant."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VBotApiClient
-from .const import CONF_API_KEY, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_HOST, VBot_URL_API, normalize_vbot_url
+from .const import CONF_API_KEY, CONF_CAPABILITIES, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_HOST, VBot_URL_API, normalize_vbot_url
 
 
 @dataclass(slots=True)
@@ -20,6 +21,9 @@ class VBotRuntimeData:
     api_url: str
     api_key: str
     client: VBotApiClient
+    capabilities: set[str] = field(default_factory=set)
+    media_api_version: int | None = None
+    availability_coordinator: Any | None = None
 
 
 def build_runtime_data(hass: HomeAssistant, entry: ConfigEntry) -> VBotRuntimeData:
@@ -34,4 +38,9 @@ def build_runtime_data(hass: HomeAssistant, entry: ConfigEntry) -> VBotRuntimeDa
         api_url=api_url,
         api_key=api_key,
         client=VBotApiClient(async_get_clientsession(hass), api_url, api_key),
+        capabilities={
+            str(item).strip()
+            for item in entry.data.get(CONF_CAPABILITIES, [])
+            if str(item).strip()
+        },
     )
