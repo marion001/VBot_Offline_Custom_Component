@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.9.0
+
+- Thêm Home Assistant Repairs cho MQTT Client ID trùng, API key bị từ chối và Media API không tương thích.
+- Thêm binary sensor chuẩn cho kết nối MQTT, microphone và kết nối Bluetooth; mặc định tắt để không làm tăng entity ngoài ý muốn.
+- Nhận danh sách capability từ mDNS, lưu theo config entry và bổ sung capability/media API version vào diagnostics.
+- Liên kết availability coordinator trực tiếp với runtime của từng config entry.
+- Tự khởi chạy Reauth khi WebUI Media API trả HTTP 401.
+- Bổ sung kiểm thử contract cho Repairs, capability discovery và entity translations.
+- Đồng bộ backend VBot: mDNS/MQTT capability contract, OTA status retained và tùy chọn backup trước cập nhật.
+- Giữ Media state ở chu kỳ 1 giây; playlist state tối đa mỗi 2 giây; Multiroom mỗi 1 giây khi hoạt động, 5 giây khi rảnh; host sensor mỗi 5 giây. Cache playlist manifest theo `mtime`, cache danh sách nhóm Multiroom 10 giây và gom OTA status về một MQTT subscription mỗi thiết bị.
+
+## 1.8.31
+
+- Chặn MQTT Client ID trùng không phân biệt chữ hoa/chữ thường và hiển thị thông báo chỉ rõ thiết bị xung đột.
+- Gom availability MQTT về một coordinator duy nhất cho mỗi thiết bị, giảm subscription và callback lặp lại.
+- Hợp nhất kiểm tra cập nhật thủ công, định kỳ và update entity qua một metadata store dùng chung.
+- Giữ nguyên quy ước VBot: release date hoặc version khác nhau đều được xem là có bản khác, kể cả downgrade.
+- Chuyển timer kiểm tra cập nhật vào vòng đời entity để reload/unload dọn tài nguyên an toàn.
+- Bổ sung kiểm thử identity, coordinator, cấu hình pytest/Ruff và workflow CI cho pytest, hassfest, HACS.
+
 ## 1.8.30
 
 - Tương thích Home Assistant 2026.6+: Reconfigure/Reauth dùng
@@ -15,11 +35,13 @@
   dependency và entity platform vẫn được nạp bởi lifecycle của integration.
 - Nâng phiên bản Home Assistant tối thiểu trong HACS lên `2026.8.0`, tương ứng
   với API Media Browser Search mà custom đang sử dụng.
+- Cảnh báo Media API cũ/thiếu capability chỉ ghi vào Home Assistant log ở mức
+  warning, không còn tạo Persistent Notification trong giao diện.
 - Thêm endpoint phiên bản/capabilities cho Media API WebUI.
 - Tự kiểm tra tương thích theo từng VBot khi ConfigEntry được nạp, chạy nền để
   không làm chậm Home Assistant khi loa tắt hoặc mất mạng.
-- Tạo một persistent notification cố định khi loa dùng Media API quá cũ, ví dụ
-  `VBot_PhongNgu cần cập nhật Media API`; tự xóa khi thiết bị đã tương thích.
+- Ghi cảnh báo log khi loa dùng Media API quá cũ, ví dụ
+  `VBot_PhongNgu cần cập nhật Media API`.
 - Đưa phiên bản, capabilities thiếu và trạng thái tương thích vào Diagnostics và
   System Health; lỗi mạng tạm thời không bị kết luận nhầm là phần mềm cũ.
 - Cập nhật README đầy đủ cho Media Browser, cache/search, playlist play-all,

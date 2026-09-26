@@ -2,7 +2,7 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
-Phiên bản hiện tại: `1.8.30`.
+Phiên bản hiện tại: `1.9.0`.
 
 Yêu cầu Home Assistant **2026.8.0 trở lên** vì Media Browser Search sử dụng API
 tìm kiếm media mới của Home Assistant.
@@ -21,8 +21,8 @@ tìm kiếm media mới của Home Assistant.
 - Hiển thị Update Entity trong `/config/updates` với ngày phát hành và phiên bản.
 - Theo dõi MQTT availability; entity điều khiển tự chuyển `unavailable` khi loa
   hoặc broker mất kết nối và phục hồi sau khi đồng bộ lại trạng thái.
-- Kiểm tra phiên bản/capabilities Media API riêng cho từng loa và cảnh báo thiết
-  bị cần cập nhật mà không tạo notification trùng.
+- Kiểm tra phiên bản/capabilities Media API riêng cho từng loa và ghi cảnh báo
+  vào Home Assistant log khi thiết bị cần cập nhật.
 - Hỗ trợ nhiều loa; mỗi loa được phân biệt bằng MQTT Client Name.
 
 ## Yêu cầu
@@ -295,15 +295,15 @@ local, playlist, playlist_play_all, radio,
 search, cache, youtube_direct
 ```
 
-Nếu một loa dùng PHP cũ hoặc thiếu capability, Home Assistant tạo một persistent
-notification cố định, ví dụ:
+Nếu một loa dùng PHP cũ hoặc thiếu capability, Home Assistant ghi cảnh báo
+trong log, ví dụ:
 
 ```text
 VBot_PhongNgu cần cập nhật Media API
 ```
 
-Reload không tạo thông báo trùng. Khi loa tương thích trở lại, notification tự
-được xóa. Loa offline/mất mạng tạm thời không bị kết luận nhầm là cần cập nhật.
+Khi loa tương thích trở lại, custom không ghi thêm cảnh báo. Loa offline/mất
+mạng tạm thời không bị kết luận nhầm là cần cập nhật.
 Kết quả kiểm tra cũng có trong Download Diagnostics và System Health.
 
 ### Cập nhật PHP Media API trên từng loa
@@ -554,6 +554,30 @@ không nhận capability mới (seek/mute/next/previous), vào **Cài đặt →
 - Mở URL API VBot từ máy Home Assistant.
 - Kiểm tra port API, firewall và URL trong Reconfigure.
 - Chọn luồng `api` và chế độ `chatbot` hoặc `processing`.
+
+### Báo trùng MQTT Client ID
+
+Từ `1.8.31`, MQTT Client ID được kiểm tra không phân biệt chữ hoa/chữ thường.
+Ví dụ `VBot_LivingRoom` và `vbot_livingroom` được xem là cùng một ID để tránh
+trùng `unique_id` của entity. Home Assistant sẽ chặn entry mới và tạo thông báo
+chỉ rõ thiết bị đã cấu hình đang xung đột; hãy đổi Client ID trên một thiết bị.
+
+### Repairs và binary sensor
+
+Phiên bản `1.9.0` đưa các lỗi cần người dùng xử lý vào mục **Sửa chữa** của Home
+Assistant: Client ID trùng, API key bị từ chối và Media API WebUI quá cũ. Component
+cũng cung cấp binary sensor chuẩn cho MQTT, microphone và Bluetooth. Các binary
+sensor này mặc định tắt; bật chúng trong trang thiết bị nếu cần automation.
+
+Backend VBot cùng phiên bản contract sẽ quảng bá capability qua mDNS và MQTT,
+gửi trạng thái OTA tại
+`<client_id>/update/state`, và hỗ trợ tùy chọn backup của Update Entity.
+
+Media state giữ chu kỳ 1 giây. Playlist state tối đa mỗi 2 giây; Multiroom cập
+nhật mỗi 1 giây khi hoạt động và mỗi 5 giây khi rảnh; host sensor tối đa mỗi
+5 giây. Danh sách nhóm Multiroom được cache 10 giây. Playlist manifest được
+cache một bản trong RAM và chỉ đọc lại khi file đổi
+`mtime`. Cache không chứa nhạc hoặc ảnh bìa và không tích lũy phiên bản cũ.
 
 ### Media Browser yêu cầu đăng nhập WebUI
 
