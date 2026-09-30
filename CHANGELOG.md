@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.1
+- Sửa các lỗi vặt, tối ưu dữ liệu
+
 ## 1.9.0
 
 - Thêm Home Assistant Repairs cho MQTT Client ID trùng, API key bị từ chối và Media API không tương thích.
