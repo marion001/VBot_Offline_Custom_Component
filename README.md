@@ -2,7 +2,7 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
-Phiên bản hiện tại: `1.9.0`.
+Phiên bản hiện tại: `1.9.1`.
 
 Yêu cầu Home Assistant **2026.8.0 trở lên** vì Media Browser Search sử dụng API
 tìm kiếm media mới của Home Assistant.

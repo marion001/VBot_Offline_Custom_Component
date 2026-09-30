@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 from datetime import datetime, timezone
 from urllib.parse import unquote, urlsplit
@@ -27,7 +28,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers import entity_registry as er
 from .const import (
     DOMAIN, CONF_DEVICE_ID, VBot_URL_API,
-    CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST, normalize_vbot_url,
+    CONF_DEVICE_TYPE, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST,
 )
 from .availability import MQTTAvailabilityMixin
 
@@ -35,6 +36,8 @@ if TYPE_CHECKING:
     from homeassistant.components.media_player import BrowseMedia, SearchMedia, SearchMediaQuery
 
 _LOGGER = logging.getLogger(__name__)
+_LOCAL_LOGO_PATH = Path(__file__).with_name("logo.png")
+_LOCAL_LOGO_URL = "vbot-assistant://logo.png"
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -107,10 +110,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         self._source_kind = None
         self._multiroom = {}
         self._is_host_device = use_host_default_cover
-        self._default_cover_url = self._build_default_cover_url(
-            api_url,
-            "/assets/img/logo.png",
-        ) if use_host_default_cover else None
+        self._default_cover_url = _LOCAL_LOGO_URL
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -142,6 +142,8 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
                         self._media_title = title
                     if cover:
                         self._attr_media_image_url = cover
+                    elif title:
+                        self._attr_media_image_url = self._default_cover_url
                     if duration is not None:
                         self._attr_media_duration = duration
                 self.async_write_ha_state()
@@ -328,18 +330,21 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             self._attr_media_position_updated_at = None
         self.async_write_ha_state()
 
-    @staticmethod
-    def _build_default_cover_url(api_url: str, image_path: str):
-        normalized = normalize_vbot_url(api_url)
-        if not normalized:
-            return None
-        parsed = urlsplit(normalized)
-        if not parsed.hostname:
-            return None
-        host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
-        # Ảnh tĩnh của loa chủ được phục vụ bởi WebUI trên cổng HTTP mặc định,
-        # không phải cổng API :5002.
-        return f"http://{host}{image_path}"
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        """Always let Home Assistant proxy artwork, including the packaged logo."""
+        return False
+
+    async def async_get_media_image(self):
+        """Return the bundled logo without contacting the VBot WebUI."""
+        if self._attr_media_image_url == _LOCAL_LOGO_URL:
+            try:
+                content = await self._hass.async_add_executor_job(_LOCAL_LOGO_PATH.read_bytes)
+                return content, "image/png"
+            except OSError as error:
+                _LOGGER.warning("Không thể đọc ảnh media dự phòng tích hợp: %s", error)
+                return None, None
+        return await super().async_get_media_image()
 
     @staticmethod
     def _number_or_none(value):
@@ -391,6 +396,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
                 self._media_title = playlist_name
                 self._attr_media_playlist = playlist_name
                 self._attr_state = MediaPlayerState.PLAYING
+                self._attr_media_image_url = self._default_cover_url
                 self.async_write_ha_state()
                 return
             play_item = await media_source.async_resolve_media(
@@ -410,6 +416,8 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         media_path = unquote(urlsplit(media_id).path)
         self._media_title = str(supplied_title or posixpath.basename(media_path) or media_id)
         self._attr_state = MediaPlayerState.PLAYING
+        supplied_cover = kwargs.get("media_image_url", "") or metadata.get("thumbnail", "")
+        self._attr_media_image_url = supplied_cover or self._default_cover_url
 
         #_LOGGER.info("Yêu cầu phát media:")
         #_LOGGER.info("  - Loại: %s", media_type)
@@ -421,7 +429,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             "media_link": self._media_url,
             "media_name": self._media_title,
             "media_player_source": metadata.get("source_label") or metadata.get("source") or "MQTT",
-            "media_cover": kwargs.get("media_image_url", "") or metadata.get("thumbnail", "")
+            "media_cover": supplied_cover
         }
 
         await mqtt.async_publish(

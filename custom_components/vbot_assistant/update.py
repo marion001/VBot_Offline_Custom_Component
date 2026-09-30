@@ -21,10 +21,11 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .availability import MQTTAvailabilityMixin, is_vbot_device_online
-from .const import DOMAIN
+from .const import DOMAIN, vbot_api_headers, vbot_host_from_url
 
 _LOGGER = logging.getLogger(__name__)
-SCAN_INTERVAL = timedelta(hours=12)
+SCAN_INTERVAL = timedelta(hours=2)
+METADATA_CACHE_TTL = timedelta(hours=12)
 _METADATA_STORE = "update_metadata_store"
 _UPDATE_ENTITIES = "update_entities"
 
@@ -50,6 +51,32 @@ def _format_release_version(
     if normalized_date:
         return f"{normalized_date} - {normalized_version}"
     return normalized_version
+
+
+async def _async_get_local_release(hass, runtime, description):
+    """Read installed metadata from VBot instead of stale retained MQTT."""
+    host = vbot_host_from_url(runtime.api_url)
+    if not host:
+        raise ValueError("VBot API URL does not contain a host")
+    folder = "html/" if description.key == "interface" else ""
+    url = (
+        f"http://{host}/includes/php_ajax/Show_file_path.php?read_file_path"
+        f"&file=/home/pi/VBot_Offline/{folder}Version.json"
+    )
+    timeout = aiohttp.ClientTimeout(total=15, connect=10)
+    async with async_get_clientsession(hass).get(
+        url, headers=vbot_api_headers(runtime.api_key), timeout=timeout
+    ) as response:
+        response.raise_for_status()
+        payload = await response.json(content_type=None)
+    if not isinstance(payload, dict) or payload.get("success") is not True:
+        raise ValueError("VBot local release response is invalid")
+    release = payload.get("data")
+    if isinstance(release, str):
+        release = json.loads(release)
+    if not isinstance(release, dict):
+        raise ValueError("VBot local release metadata is invalid")
+    return release
 
 
 async def async_refresh_vbot_updates(hass: HomeAssistant, device: str) -> None:
@@ -116,6 +143,7 @@ async def async_setup_entry(
                 runtime.device_id,
                 description,
                 runtime.availability_coordinator,
+                runtime,
             )
             for description in UPDATE_DESCRIPTIONS
         ],
@@ -139,14 +167,14 @@ class VBotUpdateMetadataStore:
         """Return cached metadata or fetch it once for all entities."""
         cached = self._cache.get(description.key)
         now = time.monotonic()
-        if cached and now - cached[0] < SCAN_INTERVAL.total_seconds():
+        if cached and now - cached[0] < METADATA_CACHE_TTL.total_seconds():
             return cached[1]
 
         lock = self._locks.setdefault(description.key, asyncio.Lock())
         async with lock:
             cached = self._cache.get(description.key)
             now = time.monotonic()
-            if cached and now - cached[0] < SCAN_INTERVAL.total_seconds():
+            if cached and now - cached[0] < METADATA_CACHE_TTL.total_seconds():
                 return cached[1]
             url = (
                 "https://api.github.com/repos/marion001/VBot_Offline/contents/"
@@ -183,12 +211,14 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         device: str,
         description: VBotUpdateDescription,
         coordinator,
+        runtime,
     ) -> None:
         self._hass = hass
         self._store = store
         self._device = device
         self._description = description
         self._coordinator = coordinator
+        self._runtime = runtime
         self._attr_name = f"{description.name} ({device})"
         self._attr_unique_id = f"{device.lower()}_{description.key}_update"
         self._attr_icon = description.icon
@@ -202,6 +232,7 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         self._attr_release_summary = None
         self._release_notes = None
         self._update_status = None
+        self._local_refresh_pending = False
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -239,6 +270,12 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         self._update_status = payload
         self._attr_in_progress = bool(payload.get("running"))
         self.async_write_ha_state()
+        if not self._attr_in_progress and str(payload.get("status") or "").lower() in {
+            "success", "completed", "complete", "updated",
+        }:
+            self._hass.async_create_task(
+                self.async_update_ha_state(force_refresh=True)
+            )
 
     @property
     def extra_state_attributes(self):
@@ -259,12 +296,28 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
             self._installed_version_number,
         )
 
+    def _schedule_local_release_refresh(self) -> None:
+        """Replace retained MQTT metadata with the current Version.json values."""
+        if self._local_refresh_pending:
+            return
+        self._local_refresh_pending = True
+
+        async def refresh_after_retained_messages():
+            try:
+                await asyncio.sleep(1)
+                await self.async_update_ha_state(force_refresh=True)
+            finally:
+                self._local_refresh_pending = False
+
+        self._hass.async_create_task(refresh_after_retained_messages())
+
     @callback
     def _handle_installed_version(self, message) -> None:
         version = str(message.payload).strip()
         self._installed_version_number = version or None
         self._refresh_installed_version()
         self.async_write_ha_state()
+        self._schedule_local_release_refresh()
 
     @callback
     def _handle_installed_release_date(self, message) -> None:
@@ -272,6 +325,7 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         self._installed_release_date = release_date or None
         self._refresh_installed_version()
         self.async_write_ha_state()
+        self._schedule_local_release_refresh()
 
     async def async_update(self) -> None:
         """Fetch the latest release metadata without doing I/O in properties."""
@@ -283,7 +337,25 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
             )
             return
         try:
-            release = await self._store.async_get(self._description)
+            local_result, release_result = await asyncio.gather(
+                _async_get_local_release(self._hass, self._runtime, self._description),
+                self._store.async_get(self._description),
+                return_exceptions=True,
+            )
+            if isinstance(local_result, dict):
+                self._installed_version_number = str(local_result.get("version") or "").strip() or None
+                self._installed_release_date = str(
+                    local_result.get("releaseDate") or local_result.get("release_date") or ""
+                ).strip() or None
+                self._refresh_installed_version()
+            elif isinstance(local_result, Exception):
+                _LOGGER.warning(
+                    "Không thể đọc phiên bản cài đặt %s cho %s: %s",
+                    self._description.key, self._device, local_result,
+                )
+            if isinstance(release_result, Exception):
+                raise release_result
+            release = release_result
             latest_version = str(release.get("version") or "").strip()
             description = str(release.get("description") or "").strip()
             release_date = str(release.get("releaseDate") or "").strip()
