@@ -12,6 +12,7 @@ import aiohttp
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .availability import is_vbot_device_online
+from .api import VBotApiClient
 from .const import DOMAIN, vbot_api_headers, vbot_host_from_url
 from .update import UPDATE_DESCRIPTIONS, get_update_metadata_store
 
@@ -59,7 +60,7 @@ async def _async_get_local_release(hass, runtime, description):
         raise ValueError("VBot API URL does not contain a host")
     folder = "html/" if description.key == "interface" else ""
     url = (
-        f"http://{host}/includes/php_ajax/Show_file_path.php?read_file_path"
+        f"{runtime.client.webui_base_url}/includes/php_ajax/Show_file_path.php?read_file_path"
         f"&file=/home/pi/VBot_Offline/{folder}Version.json"
     )
     timeout = aiohttp.ClientTimeout(total=15, connect=10)
@@ -131,9 +132,10 @@ async def _async_notify_update_result(
 ):
     notification_id = f"vbot_updates_{device_id.casefold()}"
     if not updates and not notify_when_current:
-        await hass.services.async_call(
-            "persistent_notification", "dismiss", {"notification_id": notification_id}
-        )
+        if checks_ok:
+            await hass.services.async_call(
+                "persistent_notification", "dismiss", {"notification_id": notification_id}
+            )
         return
     if updates:
         lines = [f"Phát hiện {len(updates)} thành phần có metadata khác cho **{device_id}**:"]
@@ -146,7 +148,7 @@ async def _async_notify_update_result(
             )
         host = vbot_host_from_url(api_url)
         if host:
-            lines.append(f"\nKiểm tra thiết bị: http://{host}")
+            lines.append(f"\nKiểm tra thiết bị: {VBotApiClient(None, api_url).webui_base_url}")
         title = f"Có bản VBot khác ({device_id})"
         message = "\n".join(lines)
     elif checks_ok:

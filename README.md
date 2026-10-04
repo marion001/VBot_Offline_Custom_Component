@@ -2,7 +2,7 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
-Phiên bản hiện tại: `1.9.1`.
+Phiên bản hiện tại: `1.10.0`.
 
 Yêu cầu Home Assistant **2026.8.0 trở lên** vì Media Browser Search sử dụng API
 tìm kiếm media mới của Home Assistant.
@@ -16,6 +16,13 @@ tìm kiếm media mới của Home Assistant.
   kiếm Zing MP3, YouTube, NhacCuaTui, Podcast qua API WebUI hiện có.
 - Phát TTS bằng Text + Button hoặc service `vbot_assistant.say`.
 - Dùng VBot làm Conversation Agent cho Home Assistant Assist.
+- Assist hỗ trợ khai báo tiếng Việt/tiếng Anh; chọn ngôn ngữ pipeline phù hợp
+  với ngôn ngữ đang cấu hình trên VBot để nhận diện các lệnh cục bộ.
+- Cả `chatbot` và `processing` qua Assist đều trả văn bản kết quả từ VBot;
+  Home Assistant xử lý phần đọc phản hồi, tránh đọc cùng câu trên cả hai bên.
+  Cần cập nhật backend VBot có hỗ trợ `response_type: text`.
+- Lỗi xác thực, timeout hoặc phản hồi không hợp lệ được báo là lỗi Assist;
+  HTTP 401 khởi chạy xác thực lại integration.
 - Điều khiển các switch cấu hình VBot, âm lượng, LED và nguồn nội dung.
 - Hiển thị phiên bản chương trình/giao diện VBot và kiểm tra cập nhật.
 - Hiển thị Update Entity trong `/config/updates` với ngày phát hành và phiên bản.
@@ -213,6 +220,33 @@ VBot_Phong_Khach
 ├── NhacCuaTui
 └── Podcast
 ```
+
+### Chọn nguồn phát
+
+Thiết bị Host có select **Nguồn Phát Media** với Local / VBot, Bluetooth, Multiroom Audio và
+AirPlay. Select gửi JSON `{"action":"select_source","source":"bluetooth"}`
+qua `<device>/script/media_control/set` (QoS 1, không retained). Các mã nguồn
+khác là `local_media`, `airplay` và `multiroom`.
+
+Lựa chọn hiện tại lấy từ `<device>/media_player/state`, không tự xác nhận thành
+công ngay sau khi gửi lệnh. Khi idle hoặc đang phát TTS, select có
+thể chưa có lựa chọn tương ứng. Kết quả hoặc lý do thất bại được gửi qua
+`<device>/script/media_control/state` và ghi log VBot khi thất bại.
+
+Local cần có bài đã chọn; Bluetooth cần thiết bị đang kết nối; AirPlay cần
+phiên phát từ điện thoại. Chuyển AirPlay sang nguồn khác giữ phiên, mute
+và disable ALSA; chọn lại AirPlay sẽ enable ALSA và unmute, không gửi pause/play.
+Nếu điện thoại tự ngắt phiên, cần phát/kết nối lại từ điện thoại. Nguồn được
+chọn được lưu trong bộ nhớ của VBot, không lưu qua khởi động lại.
+VBot từ chối chuyển nguồn khi đang giữ audio focus để nói/nghe.
+
+Multiroom cần có phiên âm thanh tại loa. Chọn nguồn này tiếp tục luồng hiện có
+tại vị trí live, không tạo phiên mới hoặc đổi nhóm. Chuyển sang nguồn khác chỉ
+tạm dừng Multiroom tại loa đang điều khiển, giữ kết nối nhóm.
+
+Loa chủ đang cấp âm thanh qua Audio Bridge không được chuyển nguồn bằng
+select WebUI/MQTT. VBot báo: “Hãy dừng phát nhóm hoặc chuyển vai trò loa chủ trước”.
+Nếu không đọc được trạng thái vai trò, VBot từ chối chuyển để tránh ngắt âm thanh nhóm.
 
 ### Nhạc Local
 
@@ -478,6 +512,14 @@ button.<device>_vbot_tts
 ## Conversation Agent
 
 Component tạo một agent VBot cho mỗi config entry. Trong Assist Pipeline, chọn agent tương ứng với loa cần xử lý.
+
+Hai select chế độ xử lý Assist và luồng xử lý khôi phục lựa chọn đã lưu khi
+Home Assistant khởi động lại hoặc integration reload. Giá trị hợp lệ là
+`chatbot`/`processing` và `api`; dữ liệu cũ không hợp lệ dùng mặc định
+`chatbot`/`api`. Lựa chọn được lưu riêng theo thực thể, kể cả khi MQTT làm
+trạng thái hiển thị là `unavailable`, để không mất chế độ `processing` đã chọn.
+Hai select Assist là cấu hình cục bộ của Home Assistant và vẫn khả dụng khi
+MQTT offline; các thực thể điều khiển thiết bị vẫn theo availability của loa.
 
 Hai chế độ:
 

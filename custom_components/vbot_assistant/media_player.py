@@ -9,6 +9,7 @@ Mail: VBot.Assistant@gmail.com
 from __future__ import annotations
 
 import logging
+import math
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -355,14 +356,16 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
                     return float(parts[0] * 3600 + parts[1] * 60 + parts[2])
                 if len(parts) == 2:
                     return float(parts[0] * 60 + parts[1])
-            except ValueError:
+            except (ValueError, OverflowError):
                 return None
         try:
             number = float(value) if value is not None else None
+            if number is not None and not math.isfinite(number):
+                return None
             if number is not None and number > 10000:
                 number /= 1000.0
             return number
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return None
 
     @property

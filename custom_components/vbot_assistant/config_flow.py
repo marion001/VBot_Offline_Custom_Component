@@ -116,7 +116,10 @@ async def _async_validate_device(hass, url_api, device_type, device_id, api_key=
     if not isinstance(payload, dict):
         return "invalid_device"
     if device_type == DEVICE_TYPE_HOST:
-        project_name = str((payload.get("info") or {}).get("project_name", "")).lower()
+        info = payload.get('info')
+        if not isinstance(info, dict):
+            return 'invalid_device'
+        project_name = str(info.get("project_name", "")).lower()
         if "vbot offline" not in project_name:
             return "wrong_device_type"
     else:

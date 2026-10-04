@@ -7,6 +7,7 @@ Mail: VBot.Assistant@gmail.com
 '''
 
 import logging
+import math
 import voluptuous as vol
 from homeassistant.components.number import NumberEntity
 from homeassistant.components import mqtt
@@ -100,7 +101,10 @@ class MQTTNumber(MQTTAvailabilityMixin, NumberEntity):
         }
 
     async def async_set_native_value(self, value):
-        normalized = int(round(max(self._min_value, min(self._max_value, float(value)))))
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            raise ValueError('Number must be finite')
+        normalized = int(round(max(self._min_value, min(self._max_value, numeric))))
         await mqtt.async_publish(
             self._hass,
             self._command_topic,
@@ -114,7 +118,10 @@ class MQTTNumber(MQTTAvailabilityMixin, NumberEntity):
     async def _message_received(self, msg):
         payload = msg.payload
         try:
-            self._value = float(payload)
+            numeric = float(payload)
+            if not math.isfinite(numeric) or not self._min_value <= numeric <= self._max_value:
+                raise ValueError('Number is outside the valid range')
+            self._value = numeric
             self.async_write_ha_state()
-        except ValueError:
+        except (TypeError, ValueError, OverflowError):
             _LOGGER.warning(f"Tải dữ liệu không hợp lệ cho {self._name}: {payload}")

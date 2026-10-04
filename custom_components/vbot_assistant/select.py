@@ -12,6 +12,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.restore_state import RestoreEntity, RestoredExtraData
 from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_HOST
 from .availability import MQTTAvailabilityMixin
 
@@ -45,6 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
     if runtime.device_type == DEVICE_TYPE_HOST:
         internal_entities.extend([
+            VBotMediaSourceSelect(hass, device),
             VBotDynamicMQTTSelect(
                 hass, device, "PlayList Được Chọn", f"{device}/playlist/state",
                 "playlists", "current_id", "default_id", "mdi:playlist-music",
@@ -119,6 +121,50 @@ class MQTTSelect(MQTTAvailabilityMixin, SelectEntity):
         self._state = option
         self.async_write_ha_state()
 
+class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
+    """Choose playback over MQTT; state comes only from the actual media snapshot."""
+
+    _sources = {'Local / VBot': 'local_media', 'Bluetooth': 'bluetooth', 'AirPlay': 'airplay', 'Multiroom Audio': 'multiroom'}
+
+    def __init__(self, hass, device):
+        self._hass = hass
+        self._device = device
+        self._attr_name = f'Nguồn Phát Media ({device})'
+        self._attr_unique_id = f'{device.lower()}_media_source_select'
+        self._attr_icon = 'mdi:audio-input-stereo-minijack'
+        self._attr_options = list(self._sources)
+        self._attr_current_option = None
+
+    @property
+    def device_info(self):
+        return {'identifiers': {(DOMAIN, self._device)}}
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        unsubscribe = await mqtt.async_subscribe(self._hass,
+            f'{self._device}/media_player/state', self._message_received, qos=1)
+        self.async_on_remove(unsubscribe)
+
+    @callback
+    def _message_received(self, message):
+        try:
+            payload = json.loads(message.payload)
+            if not isinstance(payload, dict):
+                raise ValueError('snapshot is not an object')
+        except (TypeError, ValueError) as error:
+            _LOGGER.warning('Snapshot nguồn phát VBot không hợp lệ: %s', error)
+            return
+        source = payload.get('source_kind')
+        self._attr_current_option = next((label for label, value in self._sources.items() if source == value), None)
+        self.async_write_ha_state()
+
+    async def async_select_option(self, option):
+        if option not in self._sources:
+            raise ValueError(f'Tùy chọn không hợp lệ: {option}')
+        await mqtt.async_publish(self._hass, f'{self._device}/script/media_control/set',
+            json.dumps({'action': 'select_source', 'source': self._sources[option]}), qos=1, retain=False)
+
+
 class VBotDynamicMQTTSelect(MQTTAvailabilityMixin, SelectEntity):
     """Select động lấy danh sách id/tên từ snapshot MQTT retained của VBot."""
 
@@ -145,15 +191,25 @@ class VBotDynamicMQTTSelect(MQTTAvailabilityMixin, SelectEntity):
     def _message_received(self, message):
         try:
             payload = json.loads(message.payload)
+            if not isinstance(payload, dict):
+                raise ValueError('snapshot is not an object')
             rows = payload.get(self._list_key, [])
+            if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+                raise ValueError('snapshot rows are not objects')
             mapping = {}
+            seen_ids = set()
             for row in rows:
                 item_id = str(row.get("id") or "").strip()
-                if not item_id:
+                if not item_id or item_id in seen_ids:
                     continue
+                seen_ids.add(item_id)
                 label = str(row.get("name") or item_id).strip()
                 if label in mapping:
                     label = f"{label} ({item_id})"
+                base_label, suffix = label, 2
+                while label in mapping:
+                    label = f'{base_label} ({suffix})'
+                    suffix += 1
                 mapping[label] = item_id
             previous_id = self.selected_id
             self._id_by_option = mapping
@@ -195,7 +251,27 @@ class VBotDynamicMQTTSelect(MQTTAvailabilityMixin, SelectEntity):
         }
 
 #Chế độ cho tác Nhân VBot Assist xử lý
-class ProcessingModeSelect(MQTTAvailabilityMixin, SelectEntity):
+class VBotAssistSelect(MQTTAvailabilityMixin, SelectEntity, RestoreEntity):
+    """Restore local Assist settings, including while MQTT is unavailable."""
+    _vbot_availability_exempt = True
+
+    @property
+    def extra_restore_state_data(self):
+        return RestoredExtraData({'option': self._attr_current_option})
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        extra = await self.async_get_last_extra_data()
+        data = extra.as_dict() if extra is not None else {}
+        option = data.get('option') if isinstance(data, dict) else None
+        if option not in self._attr_options:
+            state = await self.async_get_last_state()
+            option = state.state if state is not None else None
+        if option in self._attr_options:
+            self._attr_current_option = option
+
+
+class ProcessingModeSelect(VBotAssistSelect):
     def __init__(self, hass, device):
         self._hass = hass
         self._device = device
@@ -210,6 +286,8 @@ class ProcessingModeSelect(MQTTAvailabilityMixin, SelectEntity):
         return self._attr_current_option
 
     async def async_select_option(self, option: str):
+        if option not in self._attr_options:
+            raise ValueError(f"Tùy chọn không hợp lệ: {option}")
         self._attr_current_option = option
         self.async_write_ha_state()
 
@@ -223,7 +301,7 @@ class ProcessingModeSelect(MQTTAvailabilityMixin, SelectEntity):
         }
 
 #Lựa Chọn luồng xử lý API hoặc MQTT
-class ProcessingStreamSelect(MQTTAvailabilityMixin, SelectEntity):
+class ProcessingStreamSelect(VBotAssistSelect):
     def __init__(self, hass, device):
         self._hass = hass
         self._device = device
@@ -241,6 +319,8 @@ class ProcessingStreamSelect(MQTTAvailabilityMixin, SelectEntity):
         return self._attr_current_option
 
     async def async_select_option(self, option: str):
+        if option not in self._attr_options:
+            raise ValueError(f"Tùy chọn không hợp lệ: {option}")
         self._attr_current_option = option
         self.async_write_ha_state()
 

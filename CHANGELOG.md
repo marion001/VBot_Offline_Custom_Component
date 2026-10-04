@@ -1,7 +1,25 @@
 # Changelog
 
-## 1.9.1
-- Sửa các lỗi vặt, tối ưu dữ liệu
+## 1.10.0 — 04-10-2026
+
+- Assist khi hết thời gian chờ nhắc kiểm tra trạng thái thiết bị trước khi gửi lại lệnh điều khiển, vì VBot có thể đã nhận lệnh.
+- Sửa kiểm tra câu trả lời chọn thiết bị: tên không dấu dùng cùng cách chuẩn hóa với bộ tìm kiếm, vẫn kiểm tra số thiết bị để tránh chọn nhầm đích.
+- Assist ở chế độ processing giữ mã phiên hội thoại và tiếp tục nghe khi VBot hỏi chọn thiết bị Home Assistant; câu trả lời áp dụng hành động bật/tắt đã lưu, kiểm tra lại quyền điều khiển và hết hạn sau 30 giây.
+- Thêm Multiroom Audio vào select nguồn phát WebUI/MQTT: tiếp tục phiên hiện có tại loa, giữ nhóm và chỉ tạm dừng phát tại loa khi đổi nguồn.
+- Chặn select chuyển nguồn khi loa chủ đang cấp âm thanh cho nhóm; từ chối chuyển nếu không xác định được vai trò Multiroom.
+- Sửa kiểm tra dừng BlueALSA: bỏ qua tiến trình zombie, cho phép pgrep chờ 2 giây và trả về chi tiết lỗi/PID khi nhường ALSA thất bại.
+- Giữ phiên AirPlay khi chuyển nguồn bằng disable ALSA/mute, chọn lại bằng enable ALSA/unmute; không gửi pause/play, callback đến muộn không thay thế nguồn được chọn.
+- Thêm select Nguồn Phát Media (Local/VBot, Bluetooth, AirPlay) qua MQTT; lấy trạng thái từ snapshot thực tế và dùng chung xử lý chuyển nguồn với WebUI.
+- Chuyển xử lý chuyển nguồn MQTT sang tác vụ nền; nhả quyền ALSA của AirPlay trước khi phát Bluetooth và hủy lệnh hàng đợi đã hết thời gian chờ.
+- Sửa lỗi biến chưa khai báo khi tạo thông báo cập nhật; giữ thông báo cũ nếu kiểm tra cập nhật thất bại.
+- Tách availability của lựa chọn Assist khỏi MQTT để không tự chuyển processing thành chatbot khi MQTT offline.
+- Kiểm tra phản hồi Assist với success đúng kiểu boolean; bỏ qua snapshot select và số MQTT không hợp lệ.
+- Sửa va chạm nhãn/ID trong select động; xử lý dữ liệu API khám phá thiết bị sai cấu trúc.
+- Hủy tác vụ làm mới metadata đang chờ khi update entity bị gỡ/reload và xử lý timeout cập nhật.
+
+- Khôi phục chế độ xử lý và luồng Assist sau restart/reload bằng RestoreEntity, lưu riêng lựa chọn để hỗ trợ cả khi MQTT unavailable.
+- Chỉ khôi phục tùy chọn hợp lệ; cấu hình cũ không hợp lệ dùng chatbot/api.
+- Bổ sung kiểm tra Assist: phản hồi văn bản, lỗi HTTP/xác thực/timeout, nhiều loa, setup rollback, unload/reload và khôi phục lựa chọn.
 
 ## 1.9.0
 

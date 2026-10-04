@@ -60,7 +60,7 @@ async def _async_get_local_release(hass, runtime, description):
         raise ValueError("VBot API URL does not contain a host")
     folder = "html/" if description.key == "interface" else ""
     url = (
-        f"http://{host}/includes/php_ajax/Show_file_path.php?read_file_path"
+        f"{runtime.client.webui_base_url}/includes/php_ajax/Show_file_path.php?read_file_path"
         f"&file=/home/pi/VBot_Offline/{folder}Version.json"
     )
     timeout = aiohttp.ClientTimeout(total=15, connect=10)
@@ -233,6 +233,7 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         self._release_notes = None
         self._update_status = None
         self._local_refresh_pending = False
+        self._local_refresh_task = None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -308,8 +309,22 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
                 await self.async_update_ha_state(force_refresh=True)
             finally:
                 self._local_refresh_pending = False
+                self._local_refresh_task = None
 
-        self._hass.async_create_task(refresh_after_retained_messages())
+        self._local_refresh_task = self._hass.async_create_task(refresh_after_retained_messages())
+
+    async def async_will_remove_from_hass(self) -> None:
+        task = self._local_refresh_task
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self._local_refresh_task = None
+                self._local_refresh_pending = False
+        await super().async_will_remove_from_hass()
 
     @callback
     def _handle_installed_version(self, message) -> None:
@@ -367,7 +382,7 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
             self._release_notes = "\n\n".join(
                 part for part in (description, f"Ngày phát hành: {release_date}" if release_date else "") if part
             ) or None
-        except (aiohttp.ClientError, ValueError, TypeError, json.JSONDecodeError) as error:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError, json.JSONDecodeError) as error:
             _LOGGER.warning(
                 "Không thể kiểm tra cập nhật %s cho %s: %s",
                 self._description.key,
