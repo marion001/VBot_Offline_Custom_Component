@@ -82,7 +82,7 @@ class VBotConversationAgent(conversation.AbstractConversationAgent):
                     "response_type": "text",
                     "session_id": f'assist:{self.device_id}:{conversation_id}',
                 }
-                status, data = await self.runtime.client.async_post("", payload, timeout=120)
+                status, data = await self.runtime.client.async_post("", payload, timeout=self.entry.options.get("assist_timeout", 120))
                 if status == 200:
                     if isinstance(data, dict) and data.get("success") is True and isinstance(data.get("message"), str) and data["message"].strip():
                         response_text = data["message"]

@@ -24,7 +24,11 @@
                 "title": "Tùy chọn VBot Assistant",
                 "description": "Thiết lập cách VBot tự động cập nhật địa chỉ API qua mDNS. Dùng Cấu hình lại để thay đổi URL API hoặc API key.",
                 "data": {
-                    "auto_update_url": "Tự động cập nhật URL API qua mDNS"
+                    "auto_update_url": "Tự động cập nhật URL API qua mDNS",
+                    "assist_timeout": "Thời gian chờ phản hồi Assist (giây)"
+                },
+                "data_description": {
+                    "assist_timeout": "15–180 giây, mặc định 120. Kết nối tối đa 5 giây. Có thể chọn 30–45 cho lệnh cục bộ ngắn."
                 }
             },
             "confirm": {
@@ -63,9 +67,15 @@
     },
     "entity": {
         "binary_sensor": {
-            "mqtt_connected": {"name": "Kết nối MQTT"},
-            "microphone": {"name": "Microphone"},
-            "bluetooth_connected": {"name": "Kết nối Bluetooth"}
+            "mqtt_connected": {
+                "name": "Kết nối MQTT"
+            },
+            "microphone": {
+                "name": "Microphone"
+            },
+            "bluetooth_connected": {
+                "name": "Kết nối Bluetooth"
+            }
         }
     },
     "issues": {

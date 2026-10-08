@@ -284,6 +284,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
 
 async def _async_reload_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     """Nạp lại agent khi URL API trong Options thay đổi."""
+    runtime = getattr(entry, "runtime_data", None)
+    if runtime is not None and hasattr(runtime, "accept_metadata_update"):
+        if runtime.accept_metadata_update(entry):
+            return
     await hass.config_entries.async_reload(entry.entry_id)
 
 #Gỡ bỏ khi người dùng xóa cấu hình

@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .availability import get_vbot_availability_diagnostics
-from .const import CONF_API_KEY, DOMAIN
+from .const import CONF_API_KEY, CONF_DEVICE_ID, DOMAIN
 from .media_compat import get_media_api_compatibility
 
 
@@ -20,7 +20,8 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return safe diagnostics for one VBot config entry."""
-    runtime = entry.runtime_data
+    runtime = getattr(entry, "runtime_data", None)
+    device_id = getattr(runtime, "device_id", entry.data.get(CONF_DEVICE_ID, ""))
     return {
         "integration": {
             "domain": DOMAIN,
@@ -31,15 +32,16 @@ async def async_get_config_entry_diagnostics(
         "entry_data": async_redact_data(dict(entry.data), TO_REDACT),
         "entry_options": async_redact_data(dict(entry.options), TO_REDACT),
         "runtime": {
-            "device_id": runtime.device_id,
-            "device_type": runtime.device_type,
-            "api_url": runtime.api_url,
-            "api_key_configured": bool(runtime.api_key),
-            "capabilities": sorted(runtime.capabilities),
-            "media_api_version": runtime.media_api_version,
+            "loaded": runtime is not None,
+            "device_id": device_id,
+            "device_type": getattr(runtime, "device_type", None),
+            "api_url": getattr(runtime, "api_url", None),
+            "api_key_configured": bool(getattr(runtime, "api_key", entry.data.get(CONF_API_KEY, ""))),
+            "capabilities": sorted(getattr(runtime, "capabilities", [])),
+            "media_api_version": getattr(runtime, "media_api_version", None),
         },
         "mqtt": get_vbot_availability_diagnostics(
-            hass, runtime.device_id
+            hass, device_id
         ),
-        "media_api": get_media_api_compatibility(hass, runtime.device_id),
+        "media_api": get_media_api_compatibility(hass, device_id),
     }

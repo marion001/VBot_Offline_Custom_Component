@@ -246,16 +246,14 @@ class VBotAvailabilityCoordinator:
 
     @callback
     def _handle_capabilities(self, message) -> None:
-        """Merge capabilities advertised by the running VBot backend."""
+        """Replace the last complete MQTT capability advertisement."""
         if self.runtime is None:
             return
         try:
             payload = json.loads(message.payload)
-            values = payload.get("capabilities", []) if isinstance(payload, dict) else []
+            values = payload.get("capabilities") if isinstance(payload, dict) else None
             if isinstance(values, list):
-                self.runtime.capabilities.update(
-                    str(value).strip() for value in values if str(value).strip()
-                )
+                self.runtime.set_capabilities("mqtt", values)
         except (json.JSONDecodeError, TypeError, ValueError):
             _LOGGER.debug("Payload capability không hợp lệ cho %s", self.device)
 
@@ -304,7 +302,13 @@ async def async_setup_vbot_availability(hass, device: str, runtime=None) -> VBot
         await coordinators[device].async_shutdown()
     coordinator = VBotAvailabilityCoordinator(hass, device, runtime)
     coordinators[device] = coordinator
-    await coordinator.async_start()
+    try:
+        await coordinator.async_start()
+    except BaseException:
+        if coordinators.get(device) is coordinator:
+            coordinators.pop(device, None)
+        await coordinator.async_shutdown()
+        raise
     return coordinator
 
 

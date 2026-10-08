@@ -44,7 +44,11 @@ def _is_remote_release_different(
     current_date = _parse_release_date(current_release_date)
     remote_date = _parse_release_date(remote_release_date)
     if current_date is not None and remote_date is not None:
-        return remote_date != current_date
+        def normalized_version(value):
+            value = str(value or '').strip()
+            return value[1:] if len(value)>1 and value[0] in 'vV' and value[1].isdigit() else value
+        current_key, remote_key = normalized_version(current_version), normalized_version(remote_version)
+        return remote_date != current_date or bool(current_key and remote_key and current_key != remote_key)
     current_date_text = str(current_release_date or "").strip()
     remote_date_text = str(remote_release_date or "").strip()
     if current_date_text and remote_date_text and current_date_text != remote_date_text:
@@ -86,11 +90,11 @@ async def async_check_device_updates(hass, device_id, *, entry_id=None, notify_w
             item
             for item in hass.config_entries.async_entries(DOMAIN)
             if (entry_id and item.entry_id == entry_id)
-            or (not entry_id and item.runtime_data.device_id == device_id)
+            or (not entry_id and getattr(getattr(item, "runtime_data", None), "device_id", None) == device_id)
         ),
         None,
     )
-    if entry is None or not is_vbot_device_online(hass, device_id):
+    if entry is None or getattr(entry, "runtime_data", None) is None or not is_vbot_device_online(hass, device_id):
         return []
     store = get_update_metadata_store(hass)
     # Button/switch checks are explicit user or timer requests and must not use
@@ -142,8 +146,10 @@ async def _async_notify_update_result(
         for item in updates:
             description = item["description"]
             remote = item["remote"]
+            local = item.get('local', {})
             lines.append(
-                f"- **{description.name}**: {remote.get('version', 'N/A')} "
+                f"- **{description.name}**: đang cài {local.get('version', 'N/A')} "
+                f"({local.get('releaseDate', 'N/A')}); trên GitHub {remote.get('version', 'N/A')} "
                 f"({remote.get('releaseDate', 'N/A')})"
             )
         host = vbot_host_from_url(api_url)

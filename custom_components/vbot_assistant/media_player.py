@@ -138,7 +138,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
                 if payload.get("has_media"):
                     title = payload.get("title")
                     cover = str(payload.get("cover") or "").strip()
-                    duration = self._number_or_none(payload.get("duration_ms"))
+                    duration = self._number_or_none(payload.get("duration_ms"), milliseconds=True)
                     if title:
                         self._media_title = title
                     if cover:
@@ -348,7 +348,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         return await super().async_get_media_image()
 
     @staticmethod
-    def _number_or_none(value):
+    def _number_or_none(value, *, milliseconds=False):
         if isinstance(value, str) and ":" in value:
             try:
                 parts = [int(part) for part in value.split(":")]
@@ -362,7 +362,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             number = float(value) if value is not None else None
             if number is not None and not math.isfinite(number):
                 return None
-            if number is not None and number > 10000:
+            if number is not None and milliseconds:
                 number /= 1000.0
             return number
         except (TypeError, ValueError, OverflowError):
@@ -413,14 +413,11 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
                 from homeassistant.components.media_player.browse_media import async_process_play_media_url
 
                 media_id = async_process_play_media_url(self.hass, media_id)
-        self._media_url = media_id
         metadata = {**source_metadata, **(kwargs.get("metadata") or {})}
         supplied_title = kwargs.get("title") or metadata.get("title") or metadata.get("name")
         media_path = unquote(urlsplit(media_id).path)
-        self._media_title = str(supplied_title or posixpath.basename(media_path) or media_id)
-        self._attr_state = MediaPlayerState.PLAYING
+        media_title = str(supplied_title or posixpath.basename(media_path) or media_id)
         supplied_cover = kwargs.get("media_image_url", "") or metadata.get("thumbnail", "")
-        self._attr_media_image_url = supplied_cover or self._default_cover_url
 
         #_LOGGER.info("Yêu cầu phát media:")
         #_LOGGER.info("  - Loại: %s", media_type)
@@ -429,8 +426,8 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
 
         payload = {
             "action": "play",
-            "media_link": self._media_url,
-            "media_name": self._media_title,
+            "media_link": media_id,
+            "media_name": media_title,
             "media_player_source": metadata.get("source_label") or metadata.get("source") or "MQTT",
             "media_cover": supplied_cover
         }
@@ -442,6 +439,10 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False
         )
+        self._media_url = media_id
+        self._media_title = media_title
+        self._attr_state = MediaPlayerState.PLAYING
+        self._attr_media_image_url = supplied_cover or self._default_cover_url
         self.async_write_ha_state()
 
     async def async_browse_media(
@@ -467,7 +468,6 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
 
     async def async_media_stop(self):
         #_LOGGER.info("Dừng phát media")
-        self._attr_state = MediaPlayerState.IDLE
         await mqtt.async_publish(
             self._hass,
             f"{self._device}/script/media_control/set",
@@ -475,11 +475,11 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False
         )
+        self._attr_state = MediaPlayerState.IDLE
         self.async_write_ha_state()
 
     async def async_media_pause(self):
         #_LOGGER.info("Tạm dừng media")
-        self._attr_state = MediaPlayerState.PAUSED
         await mqtt.async_publish(
             self._hass,
             f"{self._device}/script/media_control/set",
@@ -487,6 +487,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False
         )
+        self._attr_state = MediaPlayerState.PAUSED
         self.async_write_ha_state()
 
     async def async_media_play(self):
@@ -499,7 +500,6 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             topic = f"{self._device}/script/media_control/set"
             payload = "RESUME"
 
-        self._attr_state = MediaPlayerState.PLAYING
         await mqtt.async_publish(
             self._hass,
             topic,
@@ -507,9 +507,12 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False
         )
+        self._attr_state = MediaPlayerState.PLAYING
         self.async_write_ha_state()
 
     async def async_set_volume_level(self, volume: float) -> None:
+        if not math.isfinite(volume):
+            raise ValueError('Volume must be finite')
         value = round(max(0.0, min(1.0, volume)) * 100)
         await mqtt.async_publish(
             self._hass,
@@ -529,6 +532,8 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         )
 
     async def async_media_seek(self, position: float) -> None:
+        if not math.isfinite(position):
+            raise ValueError('Seek position must be finite')
         payload = json.dumps({"action": "seek", "set_duration": max(0, round(position))})
         await mqtt.async_publish(
             self._hass, f"{self._device}/script/media_control/set",

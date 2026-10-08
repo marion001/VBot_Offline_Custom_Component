@@ -29,7 +29,7 @@ class VBotApiClient:
             f"{self.base_url}/api/health",
         ]
         headers = vbot_api_headers(self._api_key)
-        request_timeout = aiohttp.ClientTimeout(total=timeout)
+        request_timeout = aiohttp.ClientTimeout(total=timeout, connect=5)
         for url in candidates:
             try:
                 async with self._session.get(url, headers=headers, timeout=request_timeout) as response:
@@ -46,7 +46,7 @@ class VBotApiClient:
         """Post JSON and return the HTTP status and decoded response."""
         url = f"{self.base_url}/{path.lstrip('/')}"
         headers = {"Content-Type": "application/json", **vbot_api_headers(self._api_key)}
-        request_timeout = aiohttp.ClientTimeout(total=timeout)
+        request_timeout = aiohttp.ClientTimeout(total=timeout, connect=5)
         async with self._session.post(url, json=payload, headers=headers, timeout=request_timeout) as response:
             if response.status == 200:
                 return response.status, await response.json()

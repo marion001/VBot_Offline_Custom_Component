@@ -144,6 +144,30 @@ class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
         unsubscribe = await mqtt.async_subscribe(self._hass,
             f'{self._device}/media_player/state', self._message_received, qos=1)
         self.async_on_remove(unsubscribe)
+        unsubscribe = await mqtt.async_subscribe(
+            self._hass, f'{self._device}/script/media_control/state',
+            self._control_result_received, qos=1)
+        self.async_on_remove(unsubscribe)
+
+    @callback
+    def _control_result_received(self, message):
+        """Report source failures without assuming playback switched successfully."""
+        try:
+            payload = json.loads(message.payload)
+        except (TypeError, ValueError):
+            return
+        if not isinstance(payload, dict) or payload.get('action') != 'select_source':
+            return
+        if payload.get('success') is False:
+            reason = str(payload.get('message') or 'Không có lý do từ backend')
+            _LOGGER.warning('VBot %s không thể chuyển nguồn %s: %s',
+                            self._device, payload.get('source'), reason)
+            self._attr_extra_state_attributes = {'last_source_error': reason,
+                                                 'failed_source': payload.get('source')}
+            self.async_write_ha_state()
+        elif payload.get('success') is True:
+            self._attr_extra_state_attributes = {}
+            self.async_write_ha_state()
 
     @callback
     def _message_received(self, message):

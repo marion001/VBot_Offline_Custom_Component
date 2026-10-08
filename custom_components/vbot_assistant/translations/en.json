@@ -24,7 +24,11 @@
                 "title": "VBot Assistant options",
                 "description": "Configure automatic API address updates through mDNS. Use Reconfigure to change the API URL or API key.",
                 "data": {
-                    "auto_update_url": "Automatically update the API URL through mDNS"
+                    "auto_update_url": "Automatically update the API URL through mDNS",
+                    "assist_timeout": "Assist response timeout (seconds)"
+                },
+                "data_description": {
+                    "assist_timeout": "15–180 seconds; default 120. Connection timeout is 5 seconds. Use 30–45 for short local commands."
                 }
             },
             "confirm": {
@@ -63,9 +67,15 @@
     },
     "entity": {
         "binary_sensor": {
-            "mqtt_connected": {"name": "MQTT connection"},
-            "microphone": {"name": "Microphone"},
-            "bluetooth_connected": {"name": "Bluetooth connection"}
+            "mqtt_connected": {
+                "name": "MQTT connection"
+            },
+            "microphone": {
+                "name": "Microphone"
+            },
+            "bluetooth_connected": {
+                "name": "Bluetooth connection"
+            }
         }
     },
     "issues": {

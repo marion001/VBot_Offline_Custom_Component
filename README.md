@@ -2,7 +2,7 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
-Phiên bản hiện tại: `1.10.0`.
+Phiên bản hiện tại: `1.10.1`.
 
 Yêu cầu Home Assistant **2026.8.0 trở lên** vì Media Browser Search sử dụng API
 tìm kiếm media mới của Home Assistant.
@@ -665,3 +665,12 @@ Seek chỉ hỗ trợ Media Player nội bộ. Home Assistant gửi giây; compo
 
 - VBot Offline: https://github.com/marion001/VBot_Offline
 - Hỗ trợ: https://www.facebook.com/groups/1148385343358824
+
+## Cập nhật 1.10.1
+
+- mDNS cập nhật tên, phiên bản, capability và lần nhận ngay cả khi URL không đổi; chỉ xác minh API khi tự đổi URL. Metadata đơn thuần không reload integration.
+- Capability MQTT là snapshot thay thế mDNS; Media API quyết định các capability media đã biết. Snapshot rỗng hợp lệ loại bỏ capability cũ. Lỗi kết nối Media API tạm thời giữ snapshot cuối.
+- Duration/position là giây; chỉ field `_ms` được chia 1000. Hỗ trợ audio dài trên 10000 giây.
+- Select nguồn phát nhận kết quả qua `<device>/script/media_control/state`: thất bại ghi log HA và thuộc tính `last_source_error`, `failed_source`; lựa chọn vẫn chỉ đổi theo snapshot thực tế.
+- Trong **Cấu hình/Tùy chọn integration**, `assist_timeout` cho phép 15–180 giây, mặc định 120. Timeout kết nối HTTP 5 giây. Không tự gửi lại lệnh khi timeout.
+- Khi phát hành, commit cả `tests` và `.github/workflows/validate.yml` để CI chạy trên GitHub.

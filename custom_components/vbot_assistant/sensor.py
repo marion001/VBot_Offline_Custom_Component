@@ -181,10 +181,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         ),
         VBotConfigDiagnosticSensor(
             device,
-            "Lần Cập Nhật URL Qua mDNS",
+            "Lần Nhận mDNS",
             "api_url_mdns_updated",
             last_mdns_update or "Chưa cập nhật",
             "mdi:clock-check-outline",
+            entry=entry,
         ),
     ])
     async_add_entities(entities, update_before_add=True)
@@ -193,13 +194,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class VBotConfigDiagnosticSensor(SensorEntity):
     """Expose URL configuration diagnostics without extra MQTT traffic."""
 
-    def __init__(self, device, label, key, value, icon):
+    def __init__(self, device, label, key, value, icon, entry=None):
+        self._entry = entry
         self._device = device
         self._attr_name = f"{label} ({device})"
         self._attr_unique_id = f"{device.lower()}_{key}_diagnostic"
         self._attr_native_value = value
         self._attr_icon = icon
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self):
+        if self._entry is not None:
+            return self._entry.options.get(CONF_MDNS_LAST_UPDATE, self._attr_native_value)
+        return self._attr_native_value
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        if self._entry is not None:
+            async def updated(hass, entry):
+                self.async_write_ha_state()
+            self.async_on_remove(self._entry.add_update_listener(updated))
 
     @property
     def device_info(self):

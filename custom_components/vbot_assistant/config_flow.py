@@ -273,29 +273,26 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             notification_id=f"vbot_mdns_validation_failed_{device_id}",
                         )
                         return self.async_abort(reason="already_configured")
-                    updated_data = {
-                        **existing_entry.data,
-                        VBot_URL_API: discovered_url,
-                        CONF_DEVICE_TYPE: configured_device_type,
-                        CONF_CAPABILITIES: capabilities,
-                        "name": device_name,
-                        "version": device_version,
-                    }
-                    updated_options = {
-                        **_connection_free_options(existing_entry.options),
-                        CONF_AUTO_UPDATE_URL: True,
-                        CONF_URL_SOURCE: URL_SOURCE_MDNS,
-                        CONF_MDNS_LAST_UPDATE: discovered_at,
-                    }
-                    self.hass.config_entries.async_update_entry(
-                        existing_entry,
-                        data=updated_data,
-                        options=updated_options,
-                    )
-                    persistent_notification.async_dismiss(
-                        self.hass,
-                        notification_id=f"vbot_mdns_validation_failed_{device_id}",
-                    )
+            updated_data = {
+                **existing_entry.data,
+                CONF_CAPABILITIES: capabilities,
+                "name": device_name,
+                "version": device_version,
+            }
+            updated_options = {
+                **_connection_free_options(existing_entry.options),
+                CONF_MDNS_LAST_UPDATE: discovered_at,
+            }
+            if auto_update and current_url != discovered_url:
+                updated_data[VBot_URL_API] = discovered_url
+                updated_options[CONF_AUTO_UPDATE_URL] = True
+                updated_options[CONF_URL_SOURCE] = URL_SOURCE_MDNS
+            self.hass.config_entries.async_update_entry(
+                existing_entry, data=updated_data, options=updated_options,
+            )
+            persistent_notification.async_dismiss(
+                self.hass, notification_id=f"vbot_mdns_validation_failed_{device_id}",
+            )
             return self.async_abort(reason="already_configured")
 
         self.context["title_placeholders"] = {"name": device_name,}
@@ -472,6 +469,7 @@ class VBotOptionsFlowHandler(config_entries.OptionsFlow):
                 title="",
                 data={
                     **_connection_free_options(self._config_entry.options),
+                    "assist_timeout": user_input.get("assist_timeout", 120),
                     CONF_AUTO_UPDATE_URL: auto_update,
                     CONF_URL_SOURCE: URL_SOURCE_MDNS if auto_update else URL_SOURCE_MANUAL,
                 },
@@ -485,5 +483,7 @@ class VBotOptionsFlowHandler(config_entries.OptionsFlow):
         )
         schema = vol.Schema({
             vol.Required(CONF_AUTO_UPDATE_URL, default=current_auto_update): bool,
+            vol.Optional("assist_timeout", default=self._config_entry.options.get("assist_timeout", 120)):
+                vol.All(vol.Coerce(int), vol.Range(min=15, max=180)),
         })
         return self.async_show_form(step_id="init", data_schema=schema)

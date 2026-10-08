@@ -89,7 +89,7 @@ async def async_check_media_api_compatibility(
         "minimum_version": MIN_MEDIA_API_VERSION,
         "missing_capabilities": missing,
     }
-    runtime.capabilities.update(capabilities)
+    runtime.set_capabilities("media", capabilities, scope=REQUIRED_MEDIA_CAPABILITIES)
     runtime.media_api_version = version or None
     update_media_api_issue(
         hass,

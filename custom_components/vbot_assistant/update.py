@@ -45,9 +45,18 @@ def _format_release_version(
 ) -> str | None:
     """Format a release for Home Assistant's update dashboard."""
     normalized_version = str(version or "").strip()
+    if len(normalized_version) > 1 and normalized_version[0] in 'vV' and normalized_version[1].isdigit():
+        normalized_version = normalized_version[1:]
     if not normalized_version:
         return None
     normalized_date = str(release_date or "").strip()
+    from datetime import datetime
+    for date_format in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'):
+        try:
+            normalized_date = datetime.strptime(normalized_date, date_format).strftime('%d/%m/%Y')
+            break
+        except ValueError:
+            pass
     if normalized_date:
         return f"{normalized_date} - {normalized_version}"
     return normalized_version
@@ -274,9 +283,7 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
         if not self._attr_in_progress and str(payload.get("status") or "").lower() in {
             "success", "completed", "complete", "updated",
         }:
-            self._hass.async_create_task(
-                self.async_update_ha_state(force_refresh=True)
-            )
+            self._schedule_local_release_refresh()
 
     @property
     def extra_state_attributes(self):
@@ -307,6 +314,9 @@ class VBotUpdateEntity(MQTTAvailabilityMixin, UpdateEntity):
             try:
                 await asyncio.sleep(1)
                 await self.async_update_ha_state(force_refresh=True)
+                if str((getattr(self, '_update_status', None) or {}).get('status') or '').lower() in {'success', 'completed', 'complete', 'updated'}:
+                    from .update_service import async_check_device_updates
+                    await async_check_device_updates(self._hass, self._device, notify_when_current=False)
             finally:
                 self._local_refresh_pending = False
                 self._local_refresh_task = None

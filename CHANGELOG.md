@@ -1,7 +1,18 @@
 # Changelog
 
+## 1.10.1 — 08-10-2026
+
+- Cập nhật metadata mDNS khi URL không đổi, tránh reload cho metadata/timestamp.
+- Capability theo snapshot MQTT/mDNS/Media API, loại bỏ capability cũ theo nguồn có thẩm quyền.
+- Sửa duration/position audio dài: chỉ chuyển milliseconds khi field yêu cầu.
+- Select nguồn phát ghi log và thuộc tính lý do backend từ chối, giữ trạng thái theo snapshot.
+- Thêm tùy chọn timeout Assist 15–180 giây, timeout kết nối HTTP 5 giây.
+- Bổ sung test hồi quy cho các thay đổi trên.
+
+
 ## 1.10.0 — 04-10-2026
 
+- Sửa so sánh cập nhật: chuẩn hóa định dạng ngày, xét cả phiên bản khi cùng ngày phát hành, hiển thị riêng bản đang cài/bản GitHub và làm mới thông báo sau khi cập nhật thành công.
 - Assist khi hết thời gian chờ nhắc kiểm tra trạng thái thiết bị trước khi gửi lại lệnh điều khiển, vì VBot có thể đã nhận lệnh.
 - Sửa kiểm tra câu trả lời chọn thiết bị: tên không dấu dùng cùng cách chuẩn hóa với bộ tìm kiếm, vẫn kiểm tra số thiết bị để tránh chọn nhầm đích.
 - Assist ở chế độ processing giữ mã phiên hội thoại và tiếp tục nghe khi VBot hỏi chọn thiết bị Home Assistant; câu trả lời áp dụng hành động bật/tắt đã lưu, kiểm tra lại quyền điều khiển và hết hạn sau 30 giây.
