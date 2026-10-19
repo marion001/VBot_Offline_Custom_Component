@@ -48,7 +48,7 @@ DESCRIPTIONS = (
         translation_key="bluetooth_connected",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         topic_suffix="sensor/bluetooth_connection/state",
-        payload_on=frozenset({"connected", "online", "on", "true", "1"}),
+        payload_on=frozenset({"connected", "online", "on", "true", "1", "đã kết nối"}),
     ),
 )
 

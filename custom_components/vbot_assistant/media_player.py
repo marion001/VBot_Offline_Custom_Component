@@ -460,9 +460,17 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         """Search WebUI media providers for this VBot."""
         from homeassistant.components import media_source
 
+        source_id = f"media-source://{DOMAIN}/{self._entry_id}"
+        requested = getattr(query, "media_content_id", None)
+        if requested:
+            allowed = {source_id} | {f"{source_id}/{key}" for key in ("zing", "youtube", "nhaccuatui", "podcast")}
+            if requested not in allowed:
+                from homeassistant.components.media_player import BrowseError
+                raise BrowseError("Nguồn tìm kiếm không thuộc loa hoặc không hỗ trợ tìm kiếm")
+            source_id = requested
         return await media_source.async_search_media(
             self.hass,
-            f"media-source://{DOMAIN}/{self._entry_id}",
+            source_id,
             query,
         )
 

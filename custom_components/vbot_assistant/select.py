@@ -46,6 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
     if runtime.device_type == DEVICE_TYPE_HOST:
         internal_entities.extend([
+            VBotEqualizerSelect(hass, device),
             VBotMediaSourceSelect(hass, device),
             VBotDynamicMQTTSelect(
                 hass, device, "PlayList Được Chọn", f"{device}/playlist/state",
@@ -59,6 +60,94 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             ),
         ])
     async_add_entities(mqtt_entities + internal_entities, update_before_add=True)
+
+class VBotEqualizerSelect(MQTTAvailabilityMixin, SelectEntity):
+    """Select EQ using acknowledged VBot snapshots; no optimistic state."""
+
+    _attr_icon = 'mdi:equalizer'
+
+    def __init__(self, hass, device):
+        self._hass, self._device = hass, device
+        self._attr_name = f'Chế độ âm thanh - EQ ({device})'
+        self._attr_unique_id = f'{device.lower()}_equalizer_preset'
+        self._attr_options = []
+        self._attr_current_option = None
+        self._id_by_option = {}
+        self._has_snapshot = False
+
+    @property
+    def available(self):
+        return super().available and self._has_snapshot
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        for topic, callback in (
+            (f'{self._device}/equalizer/state', self._message_received),
+            (f'{self._device}/script/equalizer_control/state', self._result_received),
+        ):
+            unsubscribe = await mqtt.async_subscribe(self._hass, topic, callback, qos=1)
+            self.async_on_remove(unsubscribe)
+
+    @callback
+    def _message_received(self, message):
+        try:
+            data = json.loads(message.payload)
+            if not isinstance(data, dict) or data.get('success') is not True:
+                return
+            presets = data.get('presets')
+            if not isinstance(presets, list) or not 1 <= len(presets) <= 58:
+                return
+            mapping = {}
+            seen = set()
+            for row in presets:
+                if not isinstance(row, dict) or not isinstance(row.get('id'), str) or not isinstance(row.get('name'), str):
+                    return
+                preset_id, name = row['id'], row['name']
+                if not preset_id or preset_id in seen or not name:
+                    return
+                seen.add(preset_id)
+                label = name
+                suffix = 2
+                while label in mapping:
+                    label = f'{name} ({suffix})'; suffix += 1
+                mapping[label] = preset_id
+            current = data.get('current_id')
+            state = data.get('state')
+            if not isinstance(current, str) or current not in seen or not isinstance(state, dict) or not isinstance(state.get('current'), dict):
+                return
+            self._id_by_option = mapping
+            self._attr_options = list(mapping)
+            self._attr_current_option = next(name for name, preset_id in mapping.items() if preset_id == current)
+            self._attr_extra_state_attributes = {'eq_active': data.get('active'), 'default_preset_id': data.get('default_id'),
+                                                 'bands': state['current']}
+            self._has_snapshot = True
+            self.async_write_ha_state()
+        except (ValueError, TypeError, AttributeError):
+            _LOGGER.warning('Snapshot EQ không hợp lệ từ VBot %s', self._device)
+
+    @callback
+    def _result_received(self, message):
+        try:
+            data = json.loads(message.payload)
+            if isinstance(data, dict) and data.get('success') is False:
+                _LOGGER.warning('VBot %s không đổi được EQ: %s', self._device, data.get('message'))
+        except (ValueError, TypeError):
+            pass
+
+    async def async_select_option(self, option):
+        if option not in self._id_by_option:
+            raise ValueError('Chế độ EQ không hợp lệ')
+        preset_id = self._id_by_option[option]
+        if preset_id == 'custom':
+            return  # Custom describes manual gains; it is not a stored preset.
+        await mqtt.async_publish(self._hass, f'{self._device}/script/equalizer_control/set',
+                                 json.dumps({'action': 'select', 'id': preset_id}), qos=1, retain=False)
+
+    @property
+    def device_info(self):
+        return {'identifiers': {(DOMAIN, self._device)}, 'name': f'{self._device} VBot Assistant',
+                'manufacturer': 'Vũ Tuyển', 'model': 'VBot Assistant MQTT'}
+
 
 class MQTTSelect(MQTTAvailabilityMixin, SelectEntity):
     def __init__(self, hass, name, state_topic, command_topic, options, icon=None, device=None):

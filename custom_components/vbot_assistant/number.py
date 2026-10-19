@@ -8,11 +8,12 @@ Mail: VBot.Assistant@gmail.com
 
 import logging
 import math
+import json
 import voluptuous as vol
 from homeassistant.components.number import NumberEntity
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32
 from .availability import MQTTAvailabilityMixin
 
@@ -52,7 +53,68 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "qos": 1,
         })
     ents = [MQTTNumber(hass, device=device, **n) for n in numbers]
+    if runtime.device_type == DEVICE_TYPE_HOST:
+        ents.extend(VBotEqualizerNumber(hass,device,key,label,minimum,maximum,step,unit)
+                    for key,label,minimum,maximum,step,unit in EQ_FIELDS)
     async_add_entities(ents, update_before_add=True)
+
+
+EQ_FIELDS = (
+    ('bass_db','EQ Bass 100 Hz',-12,12,0.5,'dB'),
+    ('low_mid_db','EQ Low Mid 250 Hz',-12,12,0.5,'dB'),
+    ('mid_db','EQ Mid 630 Hz',-12,12,0.5,'dB'),
+    ('high_mid_db','EQ Presence 1.6 kHz',-12,12,0.5,'dB'),
+    ('treble_db','EQ Treble 4 kHz',-12,12,0.5,'dB'),
+    ('air_db','EQ Air 10 kHz',-12,12,0.5,'dB'),
+    ('preamp_db','EQ Preamp',-12,0,0.5,'dB'),
+    ('wet_percent','EQ Wet/Dry',0,100,1,'%'),
+)
+
+
+class VBotEqualizerNumber(MQTTAvailabilityMixin, NumberEntity):
+    _attr_icon='mdi:equalizer'
+
+    def __init__(self,hass,device,key,label,minimum,maximum,step,unit):
+        self._hass,self._device,self._key=hass,device,key
+        self._attr_name=f'{label} ({device})'
+        self._attr_unique_id=f'{device.lower()}_equalizer_{key}'
+        self._attr_native_min_value=minimum
+        self._attr_native_max_value=maximum
+        self._attr_native_step=step
+        self._attr_native_unit_of_measurement=unit
+        self._attr_native_value=None
+
+    @property
+    def available(self):
+        return super().available and self._attr_native_value is not None
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        unsubscribe=await mqtt.async_subscribe(self._hass,f'{self._device}/equalizer/state',self._message_received,qos=1)
+        self.async_on_remove(unsubscribe)
+
+    @callback
+    def _message_received(self,message):
+        try:
+            data=json.loads(message.payload)
+            if not isinstance(data,dict) or data.get('success') is not True:return
+            value=data['state']['current'][self._key]
+            if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value):return
+            if not self._attr_native_min_value<=value<=self._attr_native_max_value:return
+            self._attr_native_value=value
+            self._attr_extra_state_attributes={'eq_field':self._key,'eq_active':data.get('active')}
+            self.async_write_ha_state()
+        except (ValueError,TypeError,KeyError):
+            _LOGGER.debug('Snapshot EQ không hợp lệ cho %s',self._device)
+
+    async def async_set_native_value(self,value):
+        if isinstance(value,bool):raise ValueError('Giá trị EQ không hợp lệ')
+        numeric=float(value)
+        if not math.isfinite(numeric) or not self._attr_native_min_value<=numeric<=self._attr_native_max_value:
+            raise ValueError('Giá trị EQ ngoài giới hạn')
+        numeric=round(numeric/self._attr_native_step)*self._attr_native_step
+        await mqtt.async_publish(self._hass,f'{self._device}/script/equalizer_control/set',
+                                 json.dumps({'action':'apply','bands':{self._key:numeric}}),qos=1,retain=False)
 
 class MQTTNumber(MQTTAvailabilityMixin, NumberEntity):
     def __init__(self, hass, name, state_topic, command_topic, min_value, max_value, qos, unit_of_measurement, icon=None, device=None):

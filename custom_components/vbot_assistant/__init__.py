@@ -103,6 +103,8 @@ def _resolve_tts_devices(hass: HomeAssistant, call_data: dict) -> list[str]:
 
 #Hàm khởi tạo chung, không làm gì nếu không dùng YAML
 async def async_setup(hass: HomeAssistant, config: dict):
+    from .frontend import async_setup_frontend
+    await async_setup_frontend(hass)
     async def handle_tts(call):
         message = str(call.data.get("message", call.data.get("text", ""))).strip()
         if not message:

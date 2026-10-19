@@ -1,5 +1,80 @@
 # Changelog
 
+## 1.13.0 — 19-10-2026
+
+- Thêm tab Multiroom riêng: chọn loa thành viên, giữ loa chủ luôn được chọn, ghép nhóm qua media_player.join và rời nhóm qua media_player.unjoin.
+- Hiển thị trạng thái thực tế, chỉnh âm lượng từng loa, chọn nhóm đã lưu và dùng các nút bắt đầu/tạm dừng/tiếp tục/ngắt nhóm hiện có.
+- Khóa loa mất kết nối; không gửi lệnh khi mở tab hoặc cập nhật trạng thái. Giữ cơ chế cuộn của bản 1.12.9.
+- Kiểm tra trình duyệt cho ghép/tách nhóm, âm lượng riêng, trạng thái xác nhận và các chức năng Media/EQ cũ.
+
+## 1.12.9 — 19-10-2026
+
+- Không gán lại scrollTop trong các lần cập nhật cùng tab; chỉ khôi phục khi chuyển loa/tab.
+- Hoãn vá DOM trong lúc cuộn thẻ hoặc trang và áp dụng trạng thái mới nhất sau khi cuộn dừng; các listener thụ động không chặn thao tác trình duyệt.
+- Không ghi lại chiều cao CSS nếu giá trị không đổi; giữ getCardSize ổn định và loại thẻ khỏi scroll anchoring của trang.
+- Kiểm tra bằng sự kiện mouseWheel thật của Chrome khi cập nhật 20 lần/giây, cho cả vùng cuộn nội bộ và trang.
+
+## 1.12.8 — 19-10-2026
+
+- Giữ nguyên ha-card và main trong DOM khi cập nhật trạng thái, chỉ vá các phần thay đổi để tránh gián đoạn thao tác cuộn hoặc nhảy trang.
+- Tắt scroll anchoring bên trong danh sách thực thể; giữ vị trí cuộn theo từng loa/tab.
+
+## 1.12.7 — 19-10-2026
+
+- Select chưa có trạng thái hiển thị Chưa xác định thay vì tự hiện lựa chọn đầu tiên; vẫn cho chọn nếu chưa có trạng thái, khóa khi unavailable.
+- Hiển thị lý do backend từ chối chuyển nguồn ngay dưới select.
+- getCardSize lấy theo chiều cao thực tế thay vì cố định 9 hàng.
+
+## 1.12.6 — 19-10-2026
+
+- Bỏ đoạn diễn giải cuối tab Equalizer. Tiêu đề thẻ vẫn tùy chỉnh qua trường Tiêu đề trong editor hoặc thuộc tính title trong YAML.
+
+## 1.12.5 — 19-10-2026
+
+- Tab Điều khiển và Trạng thái cuộn bên trong, chiều cao theo tab Media ở trạng thái thu gọn.
+- Giữ vị trí cuộn theo từng loa/tab khi nhận dữ liệu mới hoặc chuyển qua lại; ngắt ResizeObserver khi gỡ thẻ.
+
+## 1.12.4 — 19-10-2026
+
+- Trên cùng khung phát hiển thị trạng thái Bluetooth kèm tên thiết bị khi kết nối và trạng thái Multiroom.
+- Dùng sensor/thuộc tính hiện có, không thêm polling. Khi chưa có dữ liệu hoặc mất kết nối HA, hiển thị trạng thái chưa xác định.
+- Binary sensor Bluetooth nhận đúng payload tiếng Việt “Đã kết nối” từ loa chủ.
+
+## 1.12.3 — 19-10-2026
+
+- Playlist, Phát thông báo TTS và Khám phá âm nhạc thu gọn/mở riêng, giữ trạng thái khi nhận dữ liệu mới.
+- Đưa âm lượng và nguồn phát vào trong khung Media, ngay dưới các nút trước/tạm dừng/tiếp.
+
+## 1.12.2 — 19-10-2026
+
+- Đưa Nguồn phát Media trở lại tab Media, trong nhóm Âm lượng và nguồn phát trước Playlist; dùng nhãn ngắn, giữ lựa chọn theo entity thực tế.
+
+## 1.12.1 — 19-10-2026
+
+- Giữ loa người dùng đã chọn khi Home Assistant gọi lại setConfig; nhớ lựa chọn theo tài khoản/trang/thẻ trên trình duyệt.
+- Bỏ các select quản trị/Assist/Multiroom/nguồn phát khỏi nhóm Media đầu tiên; vẫn có trong tab Điều khiển.
+- Playlist có danh sách động và nút Phát riêng. TTS có ô nhập và nút Phát TTS ngay trên Media.
+- Lưu lựa chọn/nội dung thành công trước khi phát, không phát dữ liệu cũ nếu lưu lỗi hoặc đã đổi loa.
+
+## 1.12.0 — 19-10-2026
+
+- Tab Media mới: ảnh bìa/nền bài hát, thời gian, thanh tua, nút phát chính và mute loa.
+- Nút mic/wakeup theo entity thực tế, lặp nhạc, hội thoại và phần tác vụ mở rộng.
+- Tìm kiếm theo nguồn có sẵn qua API Media Browser Home Assistant; duyệt và phát Local/Playlist/Radio/cache.
+- Giữ đúng phạm vi nguồn tìm kiếm của từng loa; bỏ kết quả trễ khi đổi loa, dừng đồng hồ local khi thẻ/trang không còn hiển thị.
+
+## 1.11.0 — 19-10-2026
+
+- VBot Ultimate Card: chọn loa tự khám phá theo registry, tab Media/Equalizer/Điều khiển/Trạng thái, giao diện responsive theo theme HA.
+- Thêm 6 number EQ, Preamp và Wet/Dry qua MQTT. Backend áp dụng từng dải dưới khóa file, giữ nguyên dải khác và preset mặc định.
+- Cung cấp JavaScript tại `/vbot_assistant/vbot-ultimate-card.js`; không cần thư viện frontend bên ngoài.
+
+## 1.10.2 — 19-10-2026
+
+- Thêm select “Chế độ âm thanh - EQ” qua MQTT: chế độ có sẵn và mẫu EQ đã lưu trên loa.
+- Trạng thái lấy theo xác nhận từ loa; đồng bộ khi đổi EQ trên WebUI. Không thay đổi công tắc bật EQ hoặc mẫu mặc định sau reboot.
+- Cần cập nhật mã VBot cùng phiên bản, khởi động lại VBot và tải lại tích hợp trong Home Assistant.
+
 ## 1.10.1 — 08-10-2026
 
 - Cập nhật metadata mDNS khi URL không đổi, tránh reload cho metadata/timestamp.
