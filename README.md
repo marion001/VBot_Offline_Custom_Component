@@ -728,3 +728,5 @@ Seek chỉ hỗ trợ Media Player nội bộ. Home Assistant gửi giây; compo
 - Select nguồn phát nhận kết quả qua `<device>/script/media_control/state`: thất bại ghi log HA và thuộc tính `last_source_error`, `failed_source`; lựa chọn vẫn chỉ đổi theo snapshot thực tế.
 - Trong **Cấu hình/Tùy chọn integration**, `assist_timeout` cho phép 15–180 giây, mặc định 120. Timeout kết nối HTTP 5 giây. Không tự gửi lại lệnh khi timeout.
 - Khi phát hành, commit cả `tests` và `.github/workflows/validate.yml` để CI chạy trên GitHub.
+
+<img width="513" height="1021" alt="Image" src="https://github.com/user-attachments/assets/1a5f0020-d08a-4903-9aa8-11587ec6742c" />

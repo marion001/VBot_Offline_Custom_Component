@@ -21,3 +21,5 @@ biệt chữ hoa/chữ thường.
 Các binary sensor kết nối MQTT, microphone và Bluetooth được tạo ở trạng thái
 tắt mặc định; có thể bật từ trang thiết bị. Lỗi API key, trùng MQTT Client ID và
 Media API cũ được hiển thị trong **Cài đặt → Hệ thống → Sửa chữa**.
+
+<img width="513" height="1021" alt="Image" src="https://github.com/user-attachments/assets/1a5f0020-d08a-4903-9aa8-11587ec6742c" />
