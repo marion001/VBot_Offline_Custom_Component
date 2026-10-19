@@ -90,7 +90,7 @@
     getCardSize(){return 9;}
     getGridOptions(){return {columns:12,rows:'auto',min_columns:6};}
     static getStubConfig(){return {type:'custom:vbot-ultimate-card',title:'VBot Ultimate'};}
-    static get version(){return '1.13.0';}
+    static get version(){return '1.13.1';}
     static getConfigElement(){return document.createElement('vbot-ultimate-card-editor');}
     async _loadRegistry(){
       if(this._loading||!this._hass)return;
@@ -245,7 +245,7 @@
         ${a.multiroom_coordinator?`<p class="hint">Loa chủ hiện tại: ${esc(a.multiroom_coordinator)}</p>`:''}
         <div class="room-list">${players.map(p=>{
           const own=p.id===host.id,disabled=offline(p.state)||busy||!canJoin;
-          const volume=Number(p.state.attributes.volume_level),valid=Number.isFinite(volume)&&volume>=0&&volume<=1;
+          const rawVolume=p.state.attributes.volume_level,volume=Number(rawVolume),valid=rawVolume!==null&&rawVolume!==undefined&&Number.isFinite(volume)&&volume>=0&&volume<=1;
           return `<div class="room-speaker"><label class="room-choice"><input type="checkbox" data-room-member="${esc(p.player.entity_id)}" ${own||selected.includes(p.player.entity_id)?'checked':''} ${own||disabled?'disabled':''}><ha-icon icon="mdi:speaker"></ha-icon><span><strong>${esc(p.name)}</strong><small>${own?'Loa đang điều khiển':members.includes(p.player.entity_id)?'Trong nhóm hiện tại':'Chưa thuộc nhóm'} · ${offline(p.state)?'Mất kết nối':'Sẵn sàng'}</small></span></label><div class="range"><input aria-label="Âm lượng ${esc(p.name)}" type="range" min="0" max="100" step="1" data-room-volume="${esc(p.player.entity_id)}" value="${valid?Math.round(volume*100):0}" ${offline(p.state)||!valid||!(Number(p.state.attributes.supported_features||0)&4)||this._busy.has(p.player.entity_id)?'disabled':''}><output>${valid?Math.round(volume*100)+'%':'Chưa có âm lượng'}</output></div></div>`;
         }).join('')}</div>
         <div class="room-actions"><button class="action-primary" data-room-action="join" ${!canJoin||offline(host.state)||busy?'disabled':''}>Áp dụng nhóm loa</button><button data-room-action="leave" ${!linked||offline(host.state)||busy?'disabled':''}>Rời nhóm / Phát về loa</button></div>
@@ -263,8 +263,19 @@
         const valid=new Set(this._roomPlayers().filter(p=>!offline(p.state)).map(p=>p.player.entity_id));
         if(members.some(e=>!valid.has(e)))return;
         if(!members.length){this._error='Chọn ít nhất một loa khác để ghép nhóm.';this._signature='';this._queue();return;}
-        if(await this._service(id,'join',{group_members:members}))this._roomDrafts.delete(host.id);
+        if(await this._service(id,'join',{group_members:members})){
+          this._roomDrafts.delete(host.id);this._signature='';this._queue();
+        }
       }
+    }
+    async _roomVolume(id,value){
+      const p=this._roomPlayers().find(p=>p.player.entity_id===id),volume=Number(value);
+      if(!p||offline(p.state)||!(Number(p.state.attributes.supported_features||0)&4)||!Number.isFinite(volume)||this._busy.has(id))return;
+      const generation=this._generation;
+      this._busy.add(id);this._error='';this._queue();
+      try{await this._hass.callService('media_player','volume_set',{entity_id:id,volume_level:Math.max(0,Math.min(100,volume))/100});}
+      catch(error){if(generation===this._generation)this._error=error.message||'Không đổi được âm lượng';}
+      finally{this._busy.delete(id);this._signature='';this._queue();}
     }
     _eqField(e){return /_equalizer_(preset|bass_db|low_mid_db|mid_db|high_mid_db|treble_db|air_db|preamp_db|wet_percent)$/.test(e.unique_id||'');}
     _group(title,rows){return `<section><h3>${esc(title)}</h3><div class="controls">${rows.length?rows.map(e=>this._control(e)).join(''):'<p class="empty">Loa này chưa cung cấp entity cho mục này.</p>'}</div></section>`;}
@@ -557,10 +568,7 @@
       if(t.hasAttribute('data-device')){this._selectDevice(t.value);t.blur();this._queue();return;}
       if(t.hasAttribute('data-room-member')){this._roomDrafts.set(this._selected,[...this.shadowRoot.querySelectorAll('[data-room-member]:checked')].map(e=>e.dataset.roomMember));t.blur();this._signature='';this._queue();return;}
       if(t.hasAttribute('data-room-volume')){
-        const id=t.dataset.roomVolume,p=this._roomPlayers().find(p=>p.player.entity_id===id);
-        if(p&&!offline(p.state)&&!this._busy.has(id)){
-          this._busy.add(id);this._hass.callService('media_player','volume_set',{entity_id:id,volume_level:Math.max(0,Math.min(100,Number(t.value)))/100}).catch(error=>{this._error=error.message||'Không đổi được âm lượng';}).finally(()=>{this._busy.delete(id);this._signature='';this._queue();});
-        }t.blur();return;
+        this._roomVolume(t.dataset.roomVolume,t.value);t.blur();return;
       }
       if(t.hasAttribute('data-playlist-choice')){this._playlistDrafts.set(this._selected,t.value);t.blur();this._queue();return;}
       if(t.hasAttribute('data-search-source')&&this._catalog){this._catalog.sourceId=t.value;return;}
@@ -622,5 +630,5 @@
   if(!customElements.get('vbot-ultimate-card'))customElements.define('vbot-ultimate-card',VBotUltimateCard);
   if(!customElements.get('vbot-ultimate-card-editor'))customElements.define('vbot-ultimate-card-editor',VBotUltimateCardEditor);
   window.customCards=window.customCards||[];
-  if(!window.customCards.some(c=>c.type==='vbot-ultimate-card'))window.customCards.push({type:'vbot-ultimate-card',name:'VBot Ultimate Card',description:'Tự khám phá loa · Media · EQ 6 dải · Điều khiển · Trạng thái',preview:true});
+  if(!window.customCards.some(c=>c.type==='vbot-ultimate-card'))window.customCards.push({type:'vbot-ultimate-card',name:'VBot Ultimate Card',description:'Tự khám phá loa · Media · Multiroom · EQ 6 dải · Điều khiển · Trạng thái',preview:true});
 })();

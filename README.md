@@ -2,7 +2,7 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
-Phiên bản hiện tại: `1.13.0`.
+Phiên bản hiện tại: `1.13.1`.
 
 ### Tab Multiroom
 
@@ -11,20 +11,32 @@ Phiên bản hiện tại: `1.13.0`.
 - Chọn nhóm đã lưu trên loa rồi dùng nút bắt đầu; các nút tạm dừng, tiếp tục và ngắt nhóm nằm cùng tab.
 - **Rời nhóm / Phát về loa** tách loa đang chọn; nếu là loa chủ thì dừng cả nhóm. Có xác nhận trước khi thực hiện.
 - Trạng thái lấy từ Home Assistant/MQTT sau khi loa xác nhận, không giả lập thành công và không mở thêm kết nối thăm dò. Loa chưa được thêm vào tích hợp Home Assistant sẽ chưa xuất hiện.
-- Sau khi cập nhật, sửa URL tài nguyên hiện có thành `/vbot_assistant/vbot-ultimate-card.js?v=1.13.0`, không thêm tài nguyên trùng. Khởi động lại Home Assistant rồi tải lại trang.
+- Sau khi cập nhật, khởi động lại Home Assistant rồi tải lại trang. Tài nguyên Lovelace được cập nhật tự động ở chế độ lưu trữ giao diện; chế độ tài nguyên YAML cần cập nhật URL theo hướng dẫn bên dưới.
 
 ## VBot Ultimate Card
 
-Thẻ Lovelace duy nhất với chọn loa, các tab Media, Equalizer, Điều khiển và Trạng thái. Tự khám phá entity theo thiết bị VBot trong registry Home Assistant; hỗ trợ entity đã đổi tên, preset EQ động và các select/button/text tùy chỉnh mà tích hợp đã cung cấp.
+Thẻ Lovelace duy nhất với chọn loa, các tab Media, Multiroom, Equalizer, Điều khiển và Trạng thái. Tự khám phá entity theo thiết bị VBot trong registry Home Assistant; hỗ trợ entity đã đổi tên, preset EQ động và các select/button/text tùy chỉnh mà tích hợp đã cung cấp.
 
 1. Cập nhật toàn bộ `custom_components/vbot_assistant` vào `/config/custom_components/vbot_assistant`, khởi động lại Home Assistant.
-2. Trong Dashboard → Resources, thêm URL `/vbot_assistant/vbot-ultimate-card.js?v=1.13.0`, loại **JavaScript module**. Bật Advanced Mode trong hồ sơ nếu chưa thấy Resources. Khi nâng cấp, sửa URL resource cũ, không thêm bản thứ hai của cùng thẻ.
+2. Từ bản 1.13.1, tích hợp tự thêm tài nguyên **JavaScript module** và tự cập nhật URL theo phiên bản khi Home Assistant khởi động. URL cũ trùng của chính thẻ được gộp lại; không cần nhập URL thủ công. Tải lại hoàn toàn trang sau khi cập nhật.
 3. Thêm thẻ **VBot Ultimate Card** trong danh sách thẻ, hoặc dùng YAML:
 
 ```yaml
 type: custom:vbot-ultimate-card
 title: VBot Ultimate
 ```
+
+Nếu quản lý tài nguyên Lovelace bằng YAML, thêm hoặc cập nhật trong `configuration.yaml` (gộp vào mục `lovelace` đang có), rồi tải lại tài nguyên/khởi động lại Home Assistant:
+
+```yaml
+lovelace:
+  resource_mode: yaml
+  resources:
+    - url: /vbot_assistant/vbot-ultimate-card.js?v=1.13.1
+      type: module
+```
+
+Tích hợp không tự sửa YAML. Nếu đăng ký tự động gặp lỗi, Home Assistant ghi log và các điều khiển loa vẫn tiếp tục khởi tạo; có thể thêm URL trên trong Dashboard → Resources, loại **JavaScript module**.
 
 Đổi tên “VBot Ultimate”: Chỉnh sửa dashboard → Chỉnh sửa thẻ → trường **Tiêu đề**, nhập tên mới rồi Lưu. Trong YAML chỉ cần đổi `title`, ví dụ `title: Loa thông minh của tôi`. Tiêu đề này độc lập với tên thiết bị/loa.
 
@@ -34,11 +46,11 @@ Tab Điều khiển và Trạng thái có vùng cuộn riêng bằng chuột, c�
 
 Từ 1.12.8, cập nhật trạng thái giữ nguyên khung thẻ và phần tử cuộn trong DOM, không thay toàn bộ cây HTML sau mỗi sự kiện. Chỉ những nội dung/thuộc tính thay đổi được vá lại để không làm gián đoạn cuộn đang diễn ra.
 
-Từ 1.13.0, trong lúc cuộn thẻ/trang, bản vá DOM được hoãn đến khi dừng cuộn khoảng 0,6 giây, rồi áp dụng trạng thái mới nhất. Không chặn wheel/touch/scroll của trang, không gán lại scrollTop trong cập nhật thông thường, không ghi lại chiều cao nếu không đổi. Chỉ khôi phục vị trí đã nhớ khi chuyển tab hoặc loa. Có thể kiểm tra phiên bản JS thực sự đang nạp trong Console bằng `customElements.get('vbot-ultimate-card').version`; phiên bản này phải là `1.13.0`. Nếu còn bản cũ, kiểm tra resource trùng và tải lại hoàn toàn trang/ứng dụng HA.
+Từ 1.13.1, trong lúc cuộn thẻ/trang, bản vá DOM được hoãn đến khi dừng cuộn khoảng 0,6 giây, rồi áp dụng trạng thái mới nhất. Không chặn wheel/touch/scroll của trang, không gán lại scrollTop trong cập nhật thông thường, không ghi lại chiều cao nếu không đổi. Chỉ khôi phục vị trí đã nhớ khi chuyển tab hoặc loa. Có thể kiểm tra phiên bản JS thực sự đang nạp trong Console bằng `customElements.get('vbot-ultimate-card').version`; phiên bản này phải là `1.13.1`. Nếu còn bản cũ, kiểm tra resource trùng và tải lại hoàn toàn trang/ứng dụng HA.
 
 Loa chọn trong thẻ được giữ khi cập nhật trạng thái và được nhớ trên trình duyệt sau khi tải lại trang. Bộ nhớ tách theo tài khoản HA, trang và cấu hình thẻ; nếu có nhiều thẻ giống hệt nhau muốn nhớ loa riêng, đặt `storage_key` khác nhau cho từng thẻ. Nếu trình duyệt chặn localStorage, lựa chọn vẫn giữ trong phiên hiện tại. Không tự chuyển sang loa khác nếu loa đã chọn tạm mất kết nối.
 
-Thanh **Âm lượng loa** và select **Nguồn phát Media** nằm ngay trong khung trình phát, dưới các nút trước/tạm dừng/tiếp. Các select quản trị logs/Assist/Multiroom vẫn sử dụng trong tab Điều khiển. **Playlist**, **Phát thông báo — TTS** và **Khám phá âm nhạc** có thể mở/thu gọn riêng, mặc định thu gọn và giữ trạng thái mở khi cập nhật dữ liệu. Playlist có danh sách động và nút Phát playlist; TTS tự lưu nội dung rồi phát bằng nút Phát TTS. Lỗi lưu hoặc đổi loa giữa chừng sẽ không phát tiếp nội dung cũ. Nội dung TTS nháp chỉ giữ trong bộ nhớ thẻ cho từng loa, không lưu localStorage.
+Thanh **Âm lượng loa** và select **Nguồn phát Media** nằm ngay trong khung trình phát, dưới các nút trước/tạm dừng/tiếp. Các select quản trị logs/Assist nằm trong tab Điều khiển; nhóm và nút Multiroom nằm trong tab Multiroom riêng. **Playlist**, **Phát thông báo — TTS** và **Khám phá âm nhạc** có thể mở/thu gọn riêng, mặc định thu gọn và giữ trạng thái mở khi cập nhật dữ liệu. Playlist có danh sách động và nút Phát playlist; TTS tự lưu nội dung rồi phát bằng nút Phát TTS. Lỗi lưu hoặc đổi loa giữa chừng sẽ không phát tiếp nội dung cũ. Nội dung TTS nháp chỉ giữ trong bộ nhớ thẻ cho từng loa, không lưu localStorage.
 
 Tab Media có ảnh bìa và nền theo bài hát, thời gian phát/tổng thời lượng và thanh tua nếu loa công bố khả năng SEEK. Nguồn trực tiếp không có thời lượng sẽ hiển thị thông báo tương ứng. Đồng hồ tiến trình chỉ chạy trong trình duyệt khi tab Media hiện và loa đang phát, không gửi lệnh MQTT định kỳ; tự dừng khi bỏ thẻ hoặc ẩn trang.
 

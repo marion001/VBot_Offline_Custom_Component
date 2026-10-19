@@ -1,13 +1,14 @@
 {
     "domain": "vbot_assistant",
     "name": "VBot Assistant",
-    "version": "1.13.0",
+    "version": "1.13.1",
     "documentation": "https://github.com/marion001/VBot_Offline_Custom_Component",
     "issue_tracker": "https://github.com/marion001/VBot_Offline_Custom_Component/issues",
     "requirements": [],
     "dependencies": [
         "conversation",
-        "mqtt"
+        "mqtt",
+        "lovelace"
     ],
     "codeowners": [
         "@marion001"

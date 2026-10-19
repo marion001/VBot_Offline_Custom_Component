@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.1 — 19-10-2026
+
+- Sửa hiển thị âm lượng Multiroom chưa có dữ liệu; bỏ qua lỗi âm lượng trả về chậm khi đã đổi loa, kiểm tra giá trị hữu hạn và khả năng điều chỉnh âm lượng.
+
+- Tự đăng ký tài nguyên Lovelace, cập nhật URL phiên bản và gộp bản trùng của thẻ khi Home Assistant khởi động. Không ghi lại khi URL đã đúng.
+- Chế độ tài nguyên YAML chỉ ghi hướng dẫn vào log, không tự sửa file người dùng. Lỗi đăng ký tài nguyên không ngăn điều khiển loa khởi tạo.
+
 ## 1.13.0 — 19-10-2026
 
 - Thêm tab Multiroom riêng: chọn loa thành viên, giữ loa chủ luôn được chọn, ghép nhóm qua media_player.join và rời nhóm qua media_player.unjoin.
