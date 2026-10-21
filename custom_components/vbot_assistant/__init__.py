@@ -21,6 +21,7 @@ from .const import (
     URL_SOURCE_MANUAL, URL_SOURCE_MDNS,
     DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32,
     normalize_vbot_url, platforms_for_device,
+    get_main_registry_device,
 )
 from .conversation_agent import VBotConversationAgent
 from .runtime import build_runtime_data
@@ -59,7 +60,7 @@ def _resolve_tts_devices(hass: HomeAssistant, call_data: dict) -> list[str]:
         target = str(value or "").strip()
         if not target:
             continue
-        device = device_registry.async_get(target, include_child_devices=False)
+        device = get_main_registry_device(device_registry, target)
         if device:
             identifiers = [
                 identifier for domain, identifier in device.identifiers
@@ -86,9 +87,7 @@ def _resolve_tts_devices(hass: HomeAssistant, call_data: dict) -> list[str]:
                 f"Entity {entity_id} không thuộc VBot Assistant"
             )
         if registry_entry.device_id:
-            device = device_registry.async_get(
-                registry_entry.device_id, include_child_devices=False
-            )
+            device = get_main_registry_device(device_registry, registry_entry.device_id)
             identifiers = (
                 [identifier for domain, identifier in device.identifiers if domain == DOMAIN]
                 if device else []
@@ -105,6 +104,8 @@ def _resolve_tts_devices(hass: HomeAssistant, call_data: dict) -> list[str]:
 async def async_setup(hass: HomeAssistant, config: dict):
     from .frontend import async_setup_frontend
     await async_setup_frontend(hass)
+    from .bluetooth_service import async_setup_bluetooth_service
+    await async_setup_bluetooth_service(hass, _resolve_tts_devices)
     async def handle_tts(call):
         message = str(call.data.get("message", call.data.get("text", ""))).strip()
         if not message:

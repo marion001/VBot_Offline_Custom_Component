@@ -11,6 +11,14 @@ from urllib.parse import urlsplit, urlunsplit
 DOMAIN = "vbot_assistant"
 TTS_DOMAIN = DOMAIN
 
+
+def get_main_registry_device(registry, device_id):
+    """Support HA 2026.8 and registries that also expose child devices."""
+    from inspect import signature
+    if 'include_child_devices' in signature(registry.async_get).parameters:
+        return registry.async_get(device_id, include_child_devices=False)
+    return registry.async_get(device_id)
+
 #Tên Client MQTT (Client ID MQTT) Của Loa VBot
 CONF_DEVICE_ID = "device_id"
 

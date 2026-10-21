@@ -23,7 +23,8 @@
       this._catalog=null;this._requestSeq=0;this._clock=null;
       this._playlistDrafts=new Map();this._ttsDrafts=new Map();this._composing=new Set();
       this._roomDrafts=new Map();
-      this._foldOpen={playlist:false,tts:false,library:false};
+      this._btOperations=new Map();
+      this._foldOpen={playlist:false,tts:false,library:false,'status-network':true,'status-audio':false,'status-system':false};
       this._mediaHeights=new Map();this._scrollPositions=new Map();
       this._scrollUntil=0;this._renderPending=false;this._scrollTimer=null;
       this._scrollActivity=()=>{
@@ -90,7 +91,7 @@
     getCardSize(){return 9;}
     getGridOptions(){return {columns:12,rows:'auto',min_columns:6};}
     static getStubConfig(){return {type:'custom:vbot-ultimate-card',title:'VBot Ultimate'};}
-    static get version(){return '1.13.1';}
+    static get version(){return '1.14.4';}
     static getConfigElement(){return document.createElement('vbot-ultimate-card-editor');}
     async _loadRegistry(){
       if(this._loading||!this._hass)return;
@@ -169,19 +170,19 @@
       this._device=devices.find(d=>d.id===this._selected);
       const rows=this._rows();
       const signature=JSON.stringify([this._selected,this._tab,this._error,this._registryError,[...this._busy],[...this._composing],this._foldOpen,this._playlistDrafts.get(this._selected),this._ttsDrafts.get(this._selected),
-        this._catalog,this._roomDrafts.get(this._selected),devices.map(d=>d.entities.filter(e=>domain(e.entity_id)==='media_player'||e.unique_id?.endsWith('_number_volume_state_number')).map(e=>this._hass.states[e.entity_id])),
+        this._catalog,this._roomDrafts.get(this._selected),this._btOperations.get(this._selected),devices.map(d=>d.entities.filter(e=>domain(e.entity_id)==='media_player'||e.unique_id?.endsWith('_number_volume_state_number')).map(e=>this._hass.states[e.entity_id])),
         devices.map(d=>[d.id,d.name]),rows.map(e=>[e.entity_id,e.unique_id,this._hass.states[e.entity_id]])]);
       if(signature===this._signature)return;this._signature=signature;
       const oldMain=this.shadowRoot.querySelector('main');
       const sameView=this._renderedDevice===this._selected&&oldMain?.dataset.tabContent===this._tab;
       if(oldMain?.classList.contains('entity-scroll'))this._scrollPositions.set(this._renderedDevice+':'+oldMain.dataset.tabContent,oldMain.scrollTop);
-      const tabs=[['media','mdi:music','Media'],['multiroom','mdi:speaker-multiple','Multiroom'],['eq','mdi:equalizer','Equalizer'],['control','mdi:tune','Điều khiển'],['status','mdi:information-outline','Trạng thái']];
+      const tabs=[['media','mdi:music','Media'],['eq','mdi:equalizer','Equalizer'],['multiroom','mdi:speaker-multiple','Multiroom'],['bluetooth','mdi:bluetooth','Bluetooth'],['control','mdi:tune','Điều Khiển'],['status','mdi:information-outline','Trạng Thái']];
       this._patchDOM(`<style>${STYLE}</style><ha-card>
         <header><div class="brand"><ha-icon icon="mdi:speaker-wireless"></ha-icon><div><h2>${esc(this._config.title)}</h2><small>${esc(this._device?.name||'Chọn loa VBot')}</small></div></div>
         <button data-action="refresh" class="icon" title="Khám phá lại thiết bị" aria-label="Khám phá lại thiết bị"><ha-icon icon="mdi:refresh"></ha-icon></button></header>
         <div class="device"><label>Loa đang điều khiển<select data-device aria-label="Loa đang điều khiển"><option value="">Chọn loa</option>${devices.map(d=>`<option value="${esc(d.id)}" ${d.id===this._selected?'selected':''}>${esc(d.name)}</option>`).join('')}</select></label></div>
         <nav role="tablist">${tabs.map(([id,icon,name])=>`<button role="tab" aria-selected="${id===this._tab}" data-tab="${id}"><ha-icon icon="${icon}"></ha-icon>${name}</button>`).join('')}</nav>
-        <main role="tabpanel" data-tab-content="${this._tab}" ${['multiroom','control','status'].includes(this._tab)?'class="entity-scroll" tabindex="0" aria-label="Danh sách thực thể có thể cuộn"':''}>${this._error?`<div class="error" role="alert">${esc(this._error)}</div>`:''}
+        <main role="tabpanel" data-tab-content="${this._tab}" ${['multiroom','bluetooth','control','status'].includes(this._tab)?'class="entity-scroll" tabindex="0" aria-label="Danh sách thực thể có thể cuộn"':''}>${this._error?`<div class="error" role="alert">${esc(this._error)}</div>`:''}
         ${this._registryError?`<p class="error">${esc(this._registryError)}</p>`:''}
         ${!this._device?`<p class="empty">${this._loading?'Đang khám phá loa…':'Chưa tìm thấy loa. Kiểm tra tích hợp VBot Assistant, quyền truy cập hoặc nhấn khám phá lại.'}</p>`:this._content(rows)}</main>
         <footer>${rows.length} entity · Đồng bộ qua Home Assistant</footer></ha-card>`);
@@ -218,13 +219,71 @@
     }
     _content(rows){
       if(this._tab==='multiroom')return this._multiroom();
+      if(this._tab==='bluetooth')return this._bluetooth();
       if(this._tab==='eq')return this._equalizer();
       if(this._tab==='media'){
         const media=rows.filter(e=>domain(e.entity_id)==='media_player');
         return media.map(e=>this._media(e)).join('')+this._quickControls()+(!media.length?this._mediaSettings():'')+this._playlistPanel()+this._ttsPanel()+this._mediaLibrary(media[0])+this._mediaExtras(rows);
       }
-      if(this._tab==='status')return this._group('Trạng thái và thông tin',rows.filter(e=>['sensor','binary_sensor','event','update'].includes(domain(e.entity_id))));
+      if(this._tab==='status')return this._status(rows);
       return this._group('Điều khiển và tác vụ',rows.filter(e=>!['sensor','binary_sensor','event','update','media_player'].includes(domain(e.entity_id))&&!this._eqField(e)&&!e.unique_id?.includes('_multiroom_')));
+    }
+    _status(rows){
+      const groups={network:[],audio:[],system:[]},alerts=[];
+      for(const row of rows.filter(e=>['sensor','binary_sensor','event','update'].includes(domain(e.entity_id)))){
+        const key=(row.unique_id||row.entity_id).toLowerCase(),state=this._hass.states[row.entity_id];
+        const group=/bluetooth|airplay|playback|audio|tts|wakeword|microphone|multiroom|volume/.test(key)?'audio':/wifi|wi_fi|ip_address|mqtt|mdns|server_|network|connectivity/.test(key)?'network':'system';
+        groups[group].push(row);
+        if(!state||offline(state))continue;
+        const value=String(state.state).toLowerCase(),kind=domain(row.entity_id);
+        if((kind==='binary_sensor'&&['problem','safety'].includes(state.attributes.device_class)&&value==='on')||/^(error|failed|lỗi)(\b|[:\s])/.test(value))alerts.push({row,text:this._format(state),error:true});
+        else if(kind==='update'&&value==='on')alerts.push({row,text:'Có bản cập nhật',error:false});
+        else if(/mqtt_connection/.test(key)&&['offline','disconnected','off','false','mất kết nối','không kết nối'].includes(value))alerts.push({row,text:'Mất kết nối MQTT',error:true});
+        else if(/airplay_reconnecting/.test(key)&&['on','true','1'].includes(value))alerts.push({row,text:'Đang kết nối lại AirPlay',error:false});
+      }
+      const headings=[['network','Mạng và kết nối','mdi:lan'],['audio','Âm thanh và nguồn phát','mdi:speaker'],['system','Hệ thống và phiên bản','mdi:information-outline']];
+      const noData=Object.values(groups).flat().every(row=>offline(this._hass.states[row.entity_id]));
+      const notice=alerts.length?alerts.map(({row,text,error})=>`<div class="status-notice ${error?'is-error':''}" role="status"><ha-icon icon="${error?'mdi:alert-circle':'mdi:information'}"></ha-icon><span><strong>${esc(this._name(row))}</strong><br>${esc(text)}</span><button class="icon" data-more="${esc(row.entity_id)}" aria-label="Xem chi tiết"><ha-icon icon="mdi:chevron-right"></ha-icon></button></div>`).join(''):noData?'<p class="status-notice">Chưa nhận được trạng thái mới từ loa. Kiểm tra kết nối VBot/MQTT.</p>':'<p class="hint">Chưa có cảnh báo từ các thực thể.</p>';
+      return notice+headings.filter(([key])=>groups[key].length).map(([key,title,icon])=>this._panelStart('status-'+key,`${title} · ${groups[key].length}`,icon)+`<div class="controls">${groups[key].map(row=>this._control(row)).join('')}</div></div></details>`).join('');
+    }
+    _bluetooth(){
+      const entity=this._findEntity('select','_bluetooth_output_select');
+      if(!entity)return '<p class="empty">Loa này chưa hỗ trợ quản lý Bluetooth. Cập nhật VBot và custom component.</p>';
+      const state=this._hass.states[entity.entity_id],attrs=state?.attributes||{};
+      if(offline(state))return '<p class="empty">VBot đang ngoại tuyến. Chạy VBot để quản lý kết nối Bluetooth.</p>';
+      const devices=Array.isArray(attrs.devices)?attrs.devices:[];
+      const connected=devices.filter(d=>d&&d.connected);
+      const busy=this._busy.has(entity.entity_id),disabled=this._disabled(entity);
+      const operation=this._btOperations.get(this._selected);
+      const labels={scan:'Quét thiết bị',pair:'Ghép đôi',connect:'Kết nối loa/tai nghe',sink_connect:'Kết nối điện thoại',device_disconnect:'Ngắt kết nối'};
+      const row=(device,active)=>{
+        const current=devices.find(d=>d.mac===device.mac)||device;
+        const action=active?'device_disconnect':!current.paired?'pair':current.audio_sink?'connect':current.audio_source?'sink_connect':null;
+        const blocked=!active&&current.paired&&((current.audio_sink&&attrs.roles?.source===false)||(!current.audio_sink&&current.audio_source&&attrs.roles?.sink===false));
+        const label=active?'Ngắt kết nối':!current.paired?'Ghép đôi':'Kết nối';
+        const type=current.audio_sink&&current.audio_source?'Thiết bị âm thanh hai chiều':current.audio_sink?'Loa / tai nghe':current.audio_source?'Điện thoại / nguồn nhạc':'Thiết bị Bluetooth';
+        const selected=Boolean(attrs.output_mac&&attrs.output_mac===current.mac);
+        const audio=current.output_running||current.input_running?'Đang truyền âm thanh':current.output_connected||current.input_connected?'Đã kết nối âm thanh':active?'Đã kết nối Bluetooth':'Chưa kết nối';
+        return `<div class="bt-device ${selected?'bt-output':''}"><ha-icon icon="${current.audio_sink?'mdi:speaker-bluetooth':current.audio_source?'mdi:cellphone-sound':'mdi:bluetooth'}"></ha-icon><div class="bt-name"><strong>${esc(current.name||current.mac)}</strong><small>${esc(current.mac)}</small><small>${type} · ${audio}</small>${selected?'<span class="badge">Đang làm đầu ra</span>':''}${blocked?'<small>A2DP tương ứng đang tắt trong cấu hình</small>':''}</div>${action?`<button data-bt-action="${action}" data-bt-mac="${esc(current.mac)}" ${disabled||blocked?'disabled':''}>${operation?.pending&&operation.mac===current.mac?'Đang xử lý…':esc(label)}</button>`:'<small>Chưa rõ chức năng âm thanh</small>'}</div>`;
+      };
+      const scanned=Array.isArray(attrs.scan_devices)?attrs.scan_devices.filter(d=>d&&d.mac&&!devices.some(current=>current.mac===d.mac&&current.connected)):[];
+      const progress=operation?`<div class="status-notice ${operation.error?'is-error':''}" role="status"><ha-icon icon="${operation.pending?'mdi:loading':operation.error?'mdi:alert-circle':'mdi:check-circle'}"></ha-icon><span>${esc(labels[operation.action]||operation.action)}${operation.name?' · '+esc(operation.name):''}<br>${esc(operation.pending?'Đang chờ loa xác nhận…':operation.error||'Đã được loa xác nhận.')}</span></div>`:'';
+      return `<p class="hint">Đầu ra hiện tại: <strong>${esc(attrs.output_mac?(attrs.output_name||connected.find(d=>d.mac===attrs.output_mac)?.name||attrs.output_mac):'Loa VBot')}</strong></p>${progress}<section class="media-panel"><h3>Thiết bị đang kết nối · ${connected.length}</h3>${connected.length?connected.map(d=>row(d,true)).join(''):'<p class="empty">Chưa có thiết bị Bluetooth đang kết nối.</p>'}</section>
+        <section class="media-panel"><div class="section-title"><h3>Tìm thiết bị Bluetooth</h3><button data-bt-action="scan" ${disabled?'disabled':''}><ha-icon icon="${busy?'mdi:loading':'mdi:magnify'}"></ha-icon> ${busy?'Đang xử lý…':'Quét thiết bị'}</button></div>${scanned.map(d=>row(d,false)).join('')}${!scanned.length?`<p class="empty">${attrs.scan_id?'Không có thiết bị chưa kết nối trong kết quả quét.':'Bật chế độ ghép đôi trên thiết bị rồi nhấn quét.'}</p>`:''}</section>`;
+    }
+    async _bluetoothAction(action,mac=''){
+      const entity=this._findEntity('select','_bluetooth_output_select');
+      if(!entity||this._disabled(entity))return;
+      const id=entity.entity_id;
+      const selected=this._selected;
+      const device=this._hass.states[id]?.attributes.devices?.find(d=>d.mac===mac);
+      const operation={action,mac,name:device?.name||mac,pending:true,error:''};
+      this._btOperations.set(selected,operation);
+      this._busy.add(id);this._error='';this._signature='';this._queue();
+      try{
+        await this._hass.callService(DOMAIN,'bluetooth_command',{entity_id:id,action,...(mac?{mac}:{})});
+      }catch(error){operation.error=error.message||'Không thực hiện được thao tác Bluetooth';}
+      finally{operation.pending=false;this._busy.delete(id);this._signature='';this._queue();}
     }
     _roomPlayers(){
       return discover(this._registry?.entities||[],this._registry?.devices||[],this._hass.states).map(device=>{
@@ -350,13 +409,23 @@
       };
       const state=row=>row&&!offline(this._hass.states[row.entity_id])?this._hass.states[row.entity_id].state:null;
       // The host publishes Vietnamese text; prefer it over legacy binary mappings.
-      const bluetooth=normalize(state(sensor))??normalize(state(binary));
+      let bluetooth=normalize(state(sensor))??normalize(state(binary));
       let name=state(device);
       if(!name||['không kết nối','chưa kết nối','không có dữ liệu','n/a','none'].includes(String(name).trim().toLocaleLowerCase()))name='';
+      const output=this._findEntity('select','_bluetooth_output_select');
+      const outputState=output&&this._hass.states[output.entity_id];
+      const snapshot=outputState?.attributes;
+      let count=0;
+      if(outputState&&!offline(outputState)&&outputState.state!=='unknown'&&Array.isArray(snapshot?.devices)){
+        const connected=[...new Map(snapshot.devices.filter(d=>d?.connected&&d.mac).map(d=>[d.mac,d])).values()];
+        count=connected.length;bluetooth=count>0;
+        name=connected.map(d=>d.name||d.mac).join(', ');
+      }
       const a=player.attributes;
       const multiroom=offline(player)?null:typeof a.multiroom_connected==='boolean'?a.multiroom_connected:Array.isArray(a.group_members)?a.group_members.length>1:null;
-      const chip=(kind,connected,text,icon)=>`<div class="connection ${connected===true?'connected':connected===false?'disconnected':'unknown'}" data-connection="${kind}" role="status"><ha-icon icon="${icon}"></ha-icon><div><strong>${kind==='bluetooth'?'Bluetooth':'Multiroom'}</strong><span>${esc(text)}</span></div></div>`;
-      return `<div class="connection-status">${chip('bluetooth',bluetooth,bluetooth===true?(name?'Đã kết nối · '+name:'Đã kết nối · Chưa có tên thiết bị'):bluetooth===false?'Chưa kết nối':'Chưa có trạng thái','mdi:bluetooth')}${chip('multiroom',multiroom,multiroom===true?'Đã kết nối':multiroom===false?'Chưa kết nối':'Chưa có trạng thái','mdi:speaker-multiple')}</div>`;
+      const chip=(kind,connected,text,icon,tab='')=>`<${tab?'button type="button"':'div'} class="connection ${connected===true?'connected':connected===false?'disconnected':'unknown'}" data-connection="${kind}" ${tab?`data-tab="${tab}" aria-label="Xem các thiết bị Bluetooth đang kết nối"`:'role="status"'}><ha-icon icon="${icon}"></ha-icon><div><strong>${kind==='bluetooth'?'Bluetooth':'Multiroom'}</strong><span>${esc(text)}</span></div></${tab?'button':'div'}>`;
+      const bluetoothText=count>2?`${count} thiết bị đang kết nối`:bluetooth===true?(name?'Đã kết nối · '+name:'Đã kết nối · Chưa có tên thiết bị'):bluetooth===false?'Chưa kết nối':'Chưa có trạng thái';
+      return `<div class="connection-status">${chip('bluetooth',bluetooth,bluetoothText,'mdi:bluetooth',count>0?'bluetooth':'')}${chip('multiroom',multiroom,multiroom===true?'Đã kết nối':multiroom===false?'Chưa kết nối':'Chưa có trạng thái','mdi:speaker-multiple')}</div>`;
     }
     _time(value){
       if(!Number.isFinite(value)||value<0)return '0:00';
@@ -406,8 +475,9 @@
     _mediaSettings(inline=false){
       const volume=this._findEntity('number','_number_volume_state_number');
       const source=this._findEntity('select','_media_source_select');
-      if(!volume&&!source)return '';
-      return `<section class="${inline?'player-settings':'media-panel'}">${inline?'':'<h3><ha-icon icon="mdi:speaker-wireless"></ha-icon> Âm lượng và nguồn phát</h3>'}${volume?this._control(volume,'Âm lượng loa'):''}${source?this._control(source,'Nguồn phát Media'):''}</section>`;
+      const output=this._findEntity('select','_bluetooth_output_select');
+      if(!volume&&!source&&!output)return '';
+      return `<section class="${inline?'player-settings':'media-panel'}">${inline?'':'<h3><ha-icon icon="mdi:speaker-wireless"></ha-icon> Âm lượng và nguồn phát</h3>'}${volume?this._control(volume,'Âm lượng loa'):''}${source?this._control(source,'Chuyển nguồn phát đầu vào'):''}${output?this._control(output,'Chuyển nguồn phát đầu ra:'):''}</section>`;
     }
     _panelStart(key,title,icon,className='media-panel'){
       return `<details class="${className} fold-panel" data-fold="${key}" ${this._foldOpen[key]?'open':''}><summary><ha-icon icon="${icon}"></ha-icon><span>${title}</span><ha-icon class="fold-chevron" icon="mdi:chevron-down"></ha-icon></summary><div class="fold-body">`;
@@ -519,6 +589,7 @@
       const b=event.target.closest('button');if(!b||b.disabled)return;
       this._scrollUntil=0;clearTimeout(this._scrollTimer);this._scrollTimer=null;
       if(b.dataset.tab){this._tab=b.dataset.tab;this._signature='';this._queue();}
+      if(b.dataset.btAction)this._bluetoothAction(b.dataset.btAction,b.dataset.btMac||'');
       if(b.dataset.roomAction)this._roomAction(b.dataset.roomAction);
       if(b.dataset.action==='refresh')this._loadRegistry();
       if(b.dataset.more)this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:b.dataset.more},bubbles:true,composed:true}));
@@ -583,6 +654,8 @@
     }
   }
   const STYLE=`
+    .status-notice{display:flex;align-items:center;gap:10px;margin:10px 0;padding:12px;border:1px solid var(--divider-color);border-radius:10px;background:var(--secondary-background-color);font-size:12px;line-height:1.6;overflow-wrap:anywhere}.status-notice>span{flex:1;min-width:0}.status-notice>ha-icon{flex-shrink:0;color:var(--warning-color,#e6a23c)}.status-notice.is-error{border-color:var(--error-color);color:var(--error-color)}.status-notice.is-error>ha-icon{color:var(--error-color)}.bt-device.bt-output{border-left:3px solid var(--accent);padding-left:10px}.bt-name .badge{justify-self:start;color:var(--accent)}button.connection{text-align:left;width:100%;font:inherit;cursor:pointer}button.connection:hover{border-color:var(--accent)}
+    .bt-device{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--divider-color)}.bt-device:last-child{border-bottom:0}.bt-device>ha-icon{color:var(--accent);--mdc-icon-size:22px}.bt-name{min-width:0;display:grid;gap:4px}.bt-name strong{font-size:13px;overflow-wrap:anywhere}.bt-name small{font-size:11px;color:var(--secondary-text-color)}.bt-device button{font-size:12px;padding:8px;white-space:nowrap}
     .room-list{display:grid;gap:10px;margin:16px 0}.room-speaker{border:1px solid var(--divider-color);border-radius:12px;padding:12px}.room-choice{display:flex;align-items:center;gap:10px;margin-bottom:10px}.room-choice input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}.room-choice span{display:grid;gap:4px}.room-choice small{font-size:11px}.room-actions{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
     :host{overflow-anchor:none}
     main.entity-scroll{overflow-anchor:none;scroll-behavior:auto}
@@ -630,5 +703,5 @@
   if(!customElements.get('vbot-ultimate-card'))customElements.define('vbot-ultimate-card',VBotUltimateCard);
   if(!customElements.get('vbot-ultimate-card-editor'))customElements.define('vbot-ultimate-card-editor',VBotUltimateCardEditor);
   window.customCards=window.customCards||[];
-  if(!window.customCards.some(c=>c.type==='vbot-ultimate-card'))window.customCards.push({type:'vbot-ultimate-card',name:'VBot Ultimate Card',description:'Tự khám phá loa · Media · Multiroom · EQ 6 dải · Điều khiển · Trạng thái',preview:true});
+  if(!window.customCards.some(c=>c.type==='vbot-ultimate-card'))window.customCards.push({type:'vbot-ultimate-card',name:'VBot Ultimate Card',description:'Tự khám phá loa · Media · Equalizer · Multiroom · Bluetooth · Điều Khiển · Trạng Thái',preview:true});
 })();

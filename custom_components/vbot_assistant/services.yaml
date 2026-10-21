@@ -1,3 +1,22 @@
+bluetooth_command:
+  name: Quản lý Bluetooth trên VBot
+  description: Quét, ghép đôi, kết nối hoặc ngắt thiết bị qua MQTT và chờ loa xác nhận.
+  target:
+    entity:
+      integration: vbot_assistant
+      domain: select
+  fields:
+    action:
+      name: Thao tác
+      required: true
+      selector:
+        select:
+          options: [scan, pair, connect, sink_connect, device_disconnect]
+    mac:
+      name: Địa chỉ MAC
+      description: Không cần khi quét thiết bị.
+      selector:
+        text:
 say:
   name: Phát TTS trên VBot
   description: Gửi nội dung TTS đến một hoặc nhiều thiết bị VBot qua MQTT.

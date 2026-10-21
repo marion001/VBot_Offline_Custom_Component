@@ -14,7 +14,7 @@ from homeassistant.const import (
 )
 from homeassistant.helpers import device_registry as dr
 
-from .const import CONF_DEVICE_TYPE, DEVICE_TYPE_HOST, DOMAIN
+from .const import CONF_DEVICE_TYPE, DEVICE_TYPE_HOST, DOMAIN, get_main_registry_device
 from .events import EVENT_VBOT
 
 TRIGGER_TYPES = (
@@ -46,7 +46,7 @@ async def async_validate_trigger_config(hass, config):
 
 async def async_get_triggers(hass, device_id: str) -> list[dict[str, Any]]:
     """Return triggers only for devices owned by this integration."""
-    device = dr.async_get(hass).async_get(device_id, include_child_devices=False)
+    device = get_main_registry_device(dr.async_get(hass), device_id)
     if not device or not any(identifier[0] == DOMAIN for identifier in device.identifiers):
         return []
     entries = {

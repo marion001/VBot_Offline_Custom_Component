@@ -7,11 +7,12 @@ Mail: VBot.Assistant@gmail.com
 '''
 
 import logging
+import json
 import voluptuous as vol
 from datetime import timedelta, datetime
 from dataclasses import dataclass
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
@@ -697,4 +698,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
     if runtime.device_type == DEVICE_TYPE_HOST:
         ents.append(VBotCheckAllUpdatesSwitch(hass, entry.entry_id, device))
+        ents.extend(VBotBluetoothRoleSwitch(hass, device, role) for role in ('sink', 'source'))
     async_add_entities(ents, update_before_add=True)
+
+
+class VBotBluetoothRoleSwitch(MQTTAvailabilityMixin, SwitchEntity):
+    _attr_icon = 'mdi:bluetooth'
+
+    def __init__(self, hass, device, role):
+        self._hass, self._device, self._role = hass, device, role
+        self._attr_name = f'Bluetooth A2DP {role.title()} ({device})'
+        self._attr_unique_id = f'{device.lower()}_bluetooth_a2dp_{role}'
+        self._attr_is_on = None
+
+    @property
+    def device_info(self):
+        return {'identifiers': {(DOMAIN, self._device)}}
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        unsubscribe = await mqtt.async_subscribe(self._hass,
+            f'{self._device}/bluetooth/state', self._message_received, qos=1)
+        self.async_on_remove(unsubscribe)
+
+    @callback
+    def _message_received(self, message):
+        try:
+            data = json.loads(message.payload)
+            value = data['roles'][self._role]
+            if data.get('success') is not True or not isinstance(value, bool):
+                return
+        except (ValueError, TypeError, KeyError):
+            return
+        self._attr_is_on = value
+        self.async_write_ha_state()
+
+    async def _set_role(self, enabled):
+        await mqtt.async_publish(self._hass, f'{self._device}/script/bluetooth_output_control/set',
+            json.dumps({'action': 'set_role', 'role': self._role, 'enabled': enabled}), qos=1, retain=False)
+
+    async def async_turn_on(self, **kwargs):
+        await self._set_role(True)
+
+    async def async_turn_off(self, **kwargs):
+        await self._set_role(False)

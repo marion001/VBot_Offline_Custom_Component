@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.14.4
+
+- Giữ tương thích API tra cứu thiết bị của Home Assistant 2026.8 và các bản có hỗ trợ thiết bị con.
+- Kết quả quét Bluetooth chỉ cập nhật danh sách tìm thấy; không ghi đè đầu ra và danh sách thiết bị đã được xác nhận qua MQTT.
+- Tăng phiên bản tài nguyên Lovelace để Home Assistant tải lại card sau cập nhật.
+- Bản VBot đi kèm gửi đủ các phản hồi lệnh giống nhau, đồng bộ toàn bộ trạng thái ngoài luồng mạng MQTT và cho phép thử nạp lại module Bluetooth nếu lần nạp trước thất bại.
+
+## 1.14.3 — 21-10-2026
+
+- Chọn riêng từng điện thoại đầu vào bằng `Bluetooth {tên thiết bị}` trong tab Media; tên trùng được phân biệt bằng MAC.
+- Gửi MAC qua MQTT và đồng bộ nguồn được chọn từ WebUI/VBot, kể cả khi tạm dừng nhạc. Giữ tương thích nguồn Bluetooth chung của firmware cũ.
+
+## 1.14.2 — 21-10-2026
+
+- Bluetooth hiển thị loại thiết bị, trạng thái truyền âm thanh, đầu ra đang chọn và tiến trình/lỗi thao tác theo từng loa.
+- Media nhận kết nối cả điện thoại lẫn loa/tai nghe Bluetooth. Hơn hai thiết bị hiển thị thông báo gọn, nhấn để mở tab Bluetooth.
+- Nhóm thông tin tab Trạng Thái thành Mạng, Âm thanh, Hệ thống; cảnh báo lỗi/cập nhật được tách riêng.
+
+## 1.14.1 — 21-10-2026
+
+- Tab Bluetooth chỉ hiển thị thiết bị đang kết nối với nút ngắt, cùng chức năng quét, ghép đôi và kết nối thiết bị.
+- Lệnh quản lý chờ xác nhận MQTT theo mã yêu cầu; không dùng nhầm phản hồi của thao tác khác.
+- Thứ tự tab: Media, Equalizer, Multiroom, Bluetooth, Điều Khiển, Trạng Thái. Đổi nhãn đầu vào trong Media.
+
+## 1.14.0 — 21-10-2026
+
+- Thêm tab Bluetooth, công tắc A2DP Sink/Source và chọn đầu ra trong tab Media cho loa VBot.
+- Nhận trạng thái xác nhận qua MQTT; dùng chung cấu hình và chính sách đầu ra với WebUI.
+
 ## 1.13.1 — 19-10-2026
 
 - Sửa hiển thị âm lượng Multiroom chưa có dữ liệu; bỏ qua lỗi âm lượng trả về chậm khi đã đổi loa, kiểm tra giá trị hữu hạn và khả năng điều chỉnh âm lượng.

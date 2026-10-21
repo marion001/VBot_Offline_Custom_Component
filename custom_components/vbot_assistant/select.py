@@ -48,6 +48,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         internal_entities.extend([
             VBotEqualizerSelect(hass, device),
             VBotMediaSourceSelect(hass, device),
+            VBotBluetoothOutputSelect(hass, device),
             VBotDynamicMQTTSelect(
                 hass, device, "PlayList Được Chọn", f"{device}/playlist/state",
                 "playlists", "current_id", "default_id", "mdi:playlist-music",
@@ -60,6 +61,93 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             ),
         ])
     async_add_entities(mqtt_entities + internal_entities, update_before_add=True)
+
+class VBotBluetoothOutputSelect(MQTTAvailabilityMixin, SelectEntity):
+    """Output choices confirmed by the speaker's shared Bluetooth policy."""
+    _attr_icon = 'mdi:speaker-bluetooth'
+
+    def __init__(self, hass, device):
+        self._hass, self._device = hass, device
+        self._attr_name = f'Chuyển nguồn phát đầu ra ({device})'
+        self._attr_unique_id = f'{device.lower()}_bluetooth_output_select'
+        self._attr_options = []
+        self._attr_current_option = None
+
+        self._outputs = {}
+        self._snapshot = {}
+        self._scan_devices = []
+        self._scan_id = None
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        unsubscribe = await mqtt.async_subscribe(self._hass,
+            f'{self._device}/bluetooth/state', self._message_received, qos=1)
+        self.async_on_remove(unsubscribe)
+
+        unsubscribe = await mqtt.async_subscribe(self._hass,
+            f'{self._device}/script/bluetooth_output_control/state', self._result_received, qos=1)
+        self.async_on_remove(unsubscribe)
+
+    @callback
+    def _result_received(self, message):
+        try:
+            data = json.loads(message.payload)
+            if not isinstance(data, dict) or data.get('success') is not True or not isinstance(data.get('devices'), list):
+                return
+            if data.get('action') == 'scan':
+                self._scan_devices = data['devices']
+                self._scan_id = data.get('request_id')
+                # A scan response is a result list, not the authoritative route
+                # snapshot. Keep the confirmed output until bluetooth/state.
+                self.async_write_ha_state()
+                return
+            self._message_received(message)
+        except (ValueError, TypeError):
+            return
+
+    @callback
+    def _message_received(self, message):
+        try:
+            data = json.loads(message.payload)
+            if not isinstance(data, dict) or data.get('success') is not True:
+                return
+            rows = data.get('devices', [])
+            if not isinstance(rows, list):
+                return
+            data['local_name'] = data.get('local_name') or self._snapshot.get('local_name', '')
+            outputs = {f"Loa VBot {data.get('local_name') or self._device}": ''}
+            if data.get('roles', {}).get('source', True):
+                for row in rows:
+                    if isinstance(row, dict) and row.get('paired') and row.get('audio_sink') and row.get('output_connected'):
+                        mac = row.get('mac')
+                        if isinstance(mac, str) and mac:
+                            outputs[f"{row.get('name') or mac} ({mac})"] = mac
+            selected = (data.get('route') or {}).get('device', '')
+            self._outputs, self._snapshot = outputs, data
+            self._attr_options = list(outputs)
+            self._attr_current_option = next((name for name, mac in outputs.items() if mac == selected), None)
+        except (ValueError, TypeError, AttributeError):
+            return
+        self.async_write_ha_state()
+
+    @property
+    def extra_state_attributes(self):
+        return {'devices': self._snapshot.get('devices', []), 'roles': self._snapshot.get('roles', {}),
+                'scan_devices': self._scan_devices, 'scan_id': self._scan_id,
+                'output_mac': (self._snapshot.get('route') or {}).get('device', ''),
+                'output_name': (self._snapshot.get('route') or {}).get('name', '')}
+
+    @property
+    def device_info(self):
+        return {'identifiers': {(DOMAIN, self._device)}}
+
+    async def async_select_option(self, option):
+        if option not in self._outputs:
+            raise ValueError('Đầu ra Bluetooth không còn khả dụng')
+        mac = self._outputs[option]
+        await mqtt.async_publish(self._hass, f'{self._device}/script/bluetooth_output_control/set',
+            json.dumps({'action': 'select', 'mac': mac} if mac else {'action': 'local'}), qos=1, retain=False)
+
 
 class VBotEqualizerSelect(MQTTAvailabilityMixin, SelectEntity):
     """Select EQ using acknowledged VBot snapshots; no optimistic state."""
@@ -223,6 +311,9 @@ class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
         self._attr_icon = 'mdi:audio-input-stereo-minijack'
         self._attr_options = list(self._sources)
         self._attr_current_option = None
+        self._phone_options = {}
+        self._media_snapshot = {}
+        self._input_mac = None
 
     @property
     def device_info(self):
@@ -234,9 +325,56 @@ class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
             f'{self._device}/media_player/state', self._message_received, qos=1)
         self.async_on_remove(unsubscribe)
         unsubscribe = await mqtt.async_subscribe(
+            self._hass, f'{self._device}/bluetooth/state', self._bluetooth_received, qos=1)
+        self.async_on_remove(unsubscribe)
+        unsubscribe = await mqtt.async_subscribe(
             self._hass, f'{self._device}/script/media_control/state',
             self._control_result_received, qos=1)
         self.async_on_remove(unsubscribe)
+
+    @callback
+    def _bluetooth_received(self, message):
+        import re
+        try:
+            payload = json.loads(message.payload)
+            if not isinstance(payload, dict) or not isinstance(payload.get('devices'), list):
+                return
+        except (TypeError, ValueError):
+            return
+        phones = {}
+        roles = payload.get('roles')
+        if not isinstance(roles, dict):
+            roles = {}
+        if roles.get('sink') is not False and 'input_selected' in payload:
+            for device in payload['devices']:
+                if not isinstance(device, dict):
+                    continue
+                mac = str(device.get('mac', '')).upper()
+                if (device.get('audio_source') and device.get('connected') and device.get('paired')
+                        and re.fullmatch(r'(?:[0-9A-F]{2}:){5}[0-9A-F]{2}', mac)):
+                    phones[mac] = str(device.get('name') or mac)
+        self._phone_options = {}
+        for mac, name in sorted(phones.items(), key=lambda item: (item[1].casefold(), item[0])):
+            label = 'Bluetooth ' + name
+            if list(phones.values()).count(name) > 1:
+                label += ' (' + mac + ')'
+            self._phone_options[label] = mac
+        self._input_mac = payload.get('input_selected')
+        self._attr_options = [label for label in self._sources if label != 'Bluetooth' or not phones]
+        self._attr_options[1:1] = list(self._phone_options)
+        self._update_current()
+        self.async_write_ha_state()
+
+    def _update_current(self):
+        payload = self._media_snapshot
+        source = payload.get('source_kind')
+        if payload.get('selected_source') == 'bluetooth' and payload.get('state') != 'playing':
+            source = 'bluetooth'
+        if source == 'bluetooth' and self._phone_options:
+            mac = self._input_mac or payload.get('bluetooth_input_mac')
+            self._attr_current_option = next((label for label, value in self._phone_options.items() if value == mac), None)
+        else:
+            self._attr_current_option = next((label for label, value in self._sources.items() if source == value), None)
 
     @callback
     def _control_result_received(self, message):
@@ -267,15 +405,20 @@ class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
         except (TypeError, ValueError) as error:
             _LOGGER.warning('Snapshot nguồn phát VBot không hợp lệ: %s', error)
             return
-        source = payload.get('source_kind')
-        self._attr_current_option = next((label for label, value in self._sources.items() if source == value), None)
+        self._media_snapshot = payload
+        if 'bluetooth_input_mac' in payload:
+            self._input_mac = payload['bluetooth_input_mac']
+        self._update_current()
         self.async_write_ha_state()
 
     async def async_select_option(self, option):
-        if option not in self._sources:
+        if option not in self._sources and option not in self._phone_options:
             raise ValueError(f'Tùy chọn không hợp lệ: {option}')
+        command = {'action': 'select_source', 'source': 'bluetooth' if option in self._phone_options else self._sources[option]}
+        if option in self._phone_options:
+            command['bluetooth_mac'] = self._phone_options[option]
         await mqtt.async_publish(self._hass, f'{self._device}/script/media_control/set',
-            json.dumps({'action': 'select_source', 'source': self._sources[option]}), qos=1, retain=False)
+            json.dumps(command), qos=1, retain=False)
 
 
 class VBotDynamicMQTTSelect(MQTTAvailabilityMixin, SelectEntity):
