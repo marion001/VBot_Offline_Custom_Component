@@ -54,7 +54,11 @@
         },
         "error": {
             "invalid_auth": "The API key is invalid or the host API requires authentication.",
-            "cannot_connect": "Unable to connect to the specified API URL.",
+            "cannot_connect": "Home Assistant could not connect to VBot. Check the API IP, port, and network access from the Home Assistant host.",
+            "api_timeout": "The API connection timed out. Check that Home Assistant can reach the VBot API IP address and port.",
+            "api_http_error": "The URL responded but did not return HTTP 200. Enter the VBot API base URL, such as http://IP:5002, not the WebUI URL or a nested endpoint.",
+            "invalid_response": "The VBot API responded, but its response was not valid JSON.",
+            "invalid_url": "The API URL is invalid. Use a URL such as http://IP:5002 or https://hostname.",
             "invalid_device": "The API did not return valid VBot identity data.",
             "wrong_device_type": "The API URL does not match the selected device type.",
             "wrong_device_id": "The MQTT Client Name does not match the device configuration.",

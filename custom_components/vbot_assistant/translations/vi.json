@@ -54,7 +54,11 @@
         },
         "error": {
             "invalid_auth": "API Key không đúng hoặc API loa chủ yêu cầu xác thực.",
-            "cannot_connect": "Không thể kết nối tới URL API đã nhập.",
+            "cannot_connect": "Home Assistant không kết nối được tới VBot. Kiểm tra IP, cổng API và kết nối mạng từ máy chạy Home Assistant.",
+            "api_timeout": "Quá thời gian chờ kết nối tới API. Kiểm tra Home Assistant có truy cập được IP và cổng API của VBot không.",
+            "api_http_error": "URL đã phản hồi nhưng không trả HTTP 200. Hãy nhập URL gốc của API VBot, ví dụ http://IP:5002, không nhập URL WebUI hoặc endpoint con.",
+            "invalid_response": "API VBot có phản hồi nhưng dữ liệu trả về không phải JSON hợp lệ.",
+            "invalid_url": "URL API không hợp lệ. Hãy dùng dạng http://IP:5002 hoặc https://ten-mien.",
             "invalid_device": "API không trả về dữ liệu nhận dạng VBot hợp lệ.",
             "wrong_device_type": "URL API không khớp với loại thiết bị đã chọn.",
             "wrong_device_id": "Tên Client MQTT không khớp với cấu hình trên thiết bị.",

@@ -8,6 +8,7 @@ Mail: VBot.Assistant@gmail.com
 
 import asyncio
 import json
+import logging
 import aiohttp
 import voluptuous as vol
 from datetime import datetime, timezone
@@ -24,8 +25,7 @@ from .const import (
     normalize_vbot_url, vbot_api_headers,
 )
 from .repairs import create_duplicate_device_issue
-#import logging
-#_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 def _connection_free_options(options):
@@ -91,7 +91,7 @@ def _notify_device_id_conflict(hass, requested_id: str, existing_entry) -> None:
     create_duplicate_device_issue(hass, requested_id, existing_entry.title)
 
 async def _async_validate_device(hass, url_api, device_type, device_id, api_key=""):
-    """Kiểm tra API và loại thiết bị trước khi lưu URL nhập thủ công."""
+    """Check the VBot API and return a specific config-flow error key."""
     session = async_get_clientsession(hass)
     timeout = aiohttp.ClientTimeout(total=8, connect=4)
     endpoint = (
@@ -100,6 +100,13 @@ async def _async_validate_device(hass, url_api, device_type, device_id, api_key=
         else url_api
     )
     try:
+        parsed_endpoint = urlsplit(endpoint)
+        endpoint_host = parsed_endpoint.hostname or "<host-invalid>"
+        try:
+            endpoint_port = parsed_endpoint.port
+        except ValueError:
+            endpoint_port = None
+        safe_target = f"{endpoint_host}:{endpoint_port}" if endpoint_port else endpoint_host
         async with session.get(
             endpoint,
             headers=vbot_api_headers(api_key),
@@ -108,17 +115,40 @@ async def _async_validate_device(hass, url_api, device_type, device_id, api_key=
             if response.status == 401:
                 return "invalid_auth"
             if response.status != 200:
-                return "cannot_connect"
-            payload = await response.json(content_type=None)
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+                _LOGGER.warning(
+                    "VBot API validation at %s returned HTTP %s",
+                    safe_target,
+                    response.status,
+                )
+                return "api_http_error"
+            try:
+                payload = await response.json(content_type=None)
+            except (aiohttp.ClientError, ValueError) as error:
+                _LOGGER.warning(
+                    "VBot API validation at %s returned invalid JSON (%s)",
+                    safe_target,
+                    type(error).__name__,
+                )
+                return "invalid_response"
+    except asyncio.TimeoutError:
+        _LOGGER.warning("VBot API validation timed out at %s", safe_target)
+        return "api_timeout"
+    except aiohttp.InvalidURL:
+        return "invalid_url"
+    except aiohttp.ClientError as error:
+        _LOGGER.warning(
+            "Cannot connect to VBot API at %s (%s)",
+            safe_target,
+            type(error).__name__,
+        )
         return "cannot_connect"
 
     if not isinstance(payload, dict):
         return "invalid_device"
     if device_type == DEVICE_TYPE_HOST:
-        info = payload.get('info')
+        info = payload.get("info")
         if not isinstance(info, dict):
-            return 'invalid_device'
+            return "invalid_device"
         project_name = str(info.get("project_name", "")).lower()
         if "vbot offline" not in project_name:
             return "wrong_device_type"
@@ -129,7 +159,9 @@ async def _async_validate_device(hass, url_api, device_type, device_id, api_key=
             return "wrong_device_type"
     actual_mqtt_client = str(payload.get("mqtt_client_name", "")).strip()
     if not actual_mqtt_client:
-        return "invalid_device"
+        # The public host intro intentionally hides MQTT Client ID. The URL
+        # and VBot identity are validated above; retain the user's supplied ID.
+        return None if device_type == DEVICE_TYPE_HOST else "invalid_device"
     if actual_mqtt_client != device_id.strip():
         return "wrong_device_id"
     return None
@@ -202,7 +234,8 @@ class VBotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     #Scan VBot mDNS
     async def async_step_zeroconf(self, discovery_info):
         properties = discovery_info.properties or {}
-        device_id = properties.get("device_id", "").strip()
+        # MQTT topics use the broker client ID; device_id is the stable hardware mDNS identity.
+        device_id = (properties.get("mqtt_client") or properties.get("device_id", "")).strip()
         device_name = (properties.get("name") or "VBot Assistant").strip()
         device_version = (properties.get("version") or "N/A").strip()
         device_type = (properties.get(CONF_DEVICE_TYPE) or DEVICE_TYPE_HOST).strip()

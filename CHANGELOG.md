@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.14.6
+
+- Gộp thay đổi màu, độ sáng và hiệu ứng LED; chỉ gửi lệnh sau 0,5 giây người dùng ngừng thao tác. Lệnh tắt LED được gửi ngay và hủy cập nhật đang chờ.
+
+## 1.14.5
+
+- Add an RGB LED night light with brightness, color, breathe, and color-loop controls for VBot host devices.
+- Keep manual light settings underneath existing speaker and system LED effects.
+
 ## 1.14.4
 
 - Giữ tương thích API tra cứu thiết bị của Home Assistant 2026.8 và các bản có hỗ trợ thiết bị con.

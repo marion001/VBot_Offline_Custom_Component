@@ -91,7 +91,7 @@
     getCardSize(){return 9;}
     getGridOptions(){return {columns:12,rows:'auto',min_columns:6};}
     static getStubConfig(){return {type:'custom:vbot-ultimate-card',title:'VBot Ultimate'};}
-    static get version(){return '1.14.4';}
+    static get version(){return '1.14.6';}
     static getConfigElement(){return document.createElement('vbot-ultimate-card-editor');}
     async _loadRegistry(){
       if(this._loading||!this._hass)return;
@@ -457,12 +457,15 @@
       const rows=this._rows(),find=(d,suffix)=>rows.find(e=>domain(e.entity_id)===d&&e.unique_id?.endsWith(suffix));
       const mic=find('switch','_switch_mic_on_off_state_switch');
       const wake=find('button','_wakeup')||find('switch','_switch_conversation_mode_flag_state_switch');
+      const light=this._device?.entities.find(e=>domain(e.entity_id)==='light'&&e.unique_id?.endsWith('_light_led'));
       const loop=find('switch','_switch_playlist_loop_state_switch');
       const conversation=find('switch','_switch_conversation_mode_state_switch');
       const controls=[[mic,'Mic',this._hass.states[mic?.entity_id]?.state==='on'?'mdi:microphone':'mdi:microphone-off','toggle'],
         [wake,'Wakeup','mdi:microphone-message',wake&&domain(wake.entity_id)==='button'?'press':'turn_on'],
+        [light,'LED','mdi:led-strip-variant','more'],
         [loop,'Lặp nhạc','mdi:repeat','toggle'],[conversation,'Hội thoại','mdi:chat-processing-outline','toggle']].filter(x=>x[0]);
       return `<div class="quick-controls">${controls.map(([row,label,icon,service])=>{
+        if(service==='more'){const on=this._hass.states[row.entity_id]?.state==='on';return `<button class="quick ${on?'enabled':''}" data-more="${esc(row.entity_id)}" title="LED Effects Control" aria-label="LED Effects Control" aria-pressed="${on}"><ha-icon icon="${icon}"></ha-icon><span>${label}</span></button>`;}
         const on=this._hass.states[row.entity_id]?.state==='on';
         return `<button class="quick ${on?'enabled':''}" data-quick="${esc(row.entity_id)}" data-quick-service="${service}" title="${label}" aria-label="${label}" ${service==='toggle'?`aria-pressed="${on}"`:''} ${this._disabled(row)?'disabled':''}><ha-icon icon="${icon}"></ha-icon><span>${label}</span>${service==='toggle'?`<small>${on?'Bật':'Tắt'}</small>`:''}</button>`;
       }).join('')}<button class="quick" data-tab="control"><ha-icon icon="mdi:dots-horizontal"></ha-icon><span>Tác vụ khác</span></button></div>`;

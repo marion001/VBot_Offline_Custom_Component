@@ -36,7 +36,7 @@ DEVICE_TYPE_HOST = "vbot_host"
 DEVICE_TYPE_ANDROID = "android_client"
 DEVICE_TYPE_ESP32 = "esp32_client"
 
-HOST_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "select", "button", "text", "media_player", "update"]
+HOST_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "select", "button", "text", "media_player", "light", "update"]
 ANDROID_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "button", "text", "media_player"]
 ESP32_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "button", "text", "media_player"]
 
