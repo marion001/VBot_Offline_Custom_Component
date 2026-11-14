@@ -12,8 +12,8 @@ Tài liệu sử dụng đầy đủ của integration được duy trì tại
 - ví dụ Lovelace, script và automation;
 - MQTT topics và hướng dẫn xử lý sự cố.
 
-Phiên bản `1.14.4` hỗ trợ loa chủ VBot, Phicomm R1 Client và ESP32/ESP32-S3
-Client; gồm runtime riêng từng Config Entry, Update Entity, Reconfigure/Reauth,
+Phiên bản `1.14.9` hỗ trợ loa chủ VBot, Phicomm R1 Client và ESP32/ESP32-S3
+Client (gồm điều khiển Media đầy đủ, điều khiển Bluetooth, LED RGB Effects, WakeNet, AirPlay, DLNA); gồm runtime riêng từng Config Entry, Update Entity, Reconfigure/Reauth,
 native Multiroom, Device Trigger và TTS target nhiều thiết bị. Availability dùng
 một coordinator cho mỗi thiết bị và MQTT Client ID được chống trùng không phân
 biệt chữ hoa/chữ thường.

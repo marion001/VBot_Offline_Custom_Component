@@ -13,7 +13,7 @@ from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.restore_state import RestoreEntity, RestoredExtraData
-from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_HOST
+from .const import DOMAIN, CONF_DEVICE_ID, CONF_DEVICE_TYPE, DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32
 from .availability import MQTTAvailabilityMixin
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,11 +44,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         ProcessingModeSelect(hass, device),
         ProcessingStreamSelect(hass, device)
     ]
+    if runtime.device_type in (DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32):
+        internal_entities.append(VBotBluetoothOutputSelect(hass, device))
     if runtime.device_type == DEVICE_TYPE_HOST:
         internal_entities.extend([
             VBotEqualizerSelect(hass, device),
             VBotMediaSourceSelect(hass, device),
-            VBotBluetoothOutputSelect(hass, device),
             VBotDynamicMQTTSelect(
                 hass, device, "PlayList Được Chọn", f"{device}/playlist/state",
                 "playlists", "current_id", "default_id", "mdi:playlist-music",

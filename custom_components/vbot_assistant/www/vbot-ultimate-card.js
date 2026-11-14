@@ -91,7 +91,7 @@
     getCardSize(){return 9;}
     getGridOptions(){return {columns:12,rows:'auto',min_columns:6};}
     static getStubConfig(){return {type:'custom:vbot-ultimate-card',title:'VBot Ultimate'};}
-    static get version(){return '1.14.6';}
+    static get version(){return '1.14.9';}
     static getConfigElement(){return document.createElement('vbot-ultimate-card-editor');}
     async _loadRegistry(){
       if(this._loading||!this._hass)return;
@@ -248,28 +248,99 @@
     }
     _bluetooth(){
       const entity=this._findEntity('select','_bluetooth_output_select');
-      if(!entity)return '<p class="empty">Loa này chưa hỗ trợ quản lý Bluetooth. Cập nhật VBot và custom component.</p>';
-      const state=this._hass.states[entity.entity_id],attrs=state?.attributes||{};
-      if(offline(state))return '<p class="empty">VBot đang ngoại tuyến. Chạy VBot để quản lý kết nối Bluetooth.</p>';
-      const devices=Array.isArray(attrs.devices)?attrs.devices:[];
-      const connected=devices.filter(d=>d&&d.connected);
-      const busy=this._busy.has(entity.entity_id),disabled=this._disabled(entity);
-      const operation=this._btOperations.get(this._selected);
-      const labels={scan:'Quét thiết bị',pair:'Ghép đôi',connect:'Kết nối loa/tai nghe',sink_connect:'Kết nối điện thoại',device_disconnect:'Ngắt kết nối'};
-      const row=(device,active)=>{
-        const current=devices.find(d=>d.mac===device.mac)||device;
-        const action=active?'device_disconnect':!current.paired?'pair':current.audio_sink?'connect':current.audio_source?'sink_connect':null;
-        const blocked=!active&&current.paired&&((current.audio_sink&&attrs.roles?.source===false)||(!current.audio_sink&&current.audio_source&&attrs.roles?.sink===false));
-        const label=active?'Ngắt kết nối':!current.paired?'Ghép đôi':'Kết nối';
-        const type=current.audio_sink&&current.audio_source?'Thiết bị âm thanh hai chiều':current.audio_sink?'Loa / tai nghe':current.audio_source?'Điện thoại / nguồn nhạc':'Thiết bị Bluetooth';
-        const selected=Boolean(attrs.output_mac&&attrs.output_mac===current.mac);
-        const audio=current.output_running||current.input_running?'Đang truyền âm thanh':current.output_connected||current.input_connected?'Đã kết nối âm thanh':active?'Đã kết nối Bluetooth':'Chưa kết nối';
-        return `<div class="bt-device ${selected?'bt-output':''}"><ha-icon icon="${current.audio_sink?'mdi:speaker-bluetooth':current.audio_source?'mdi:cellphone-sound':'mdi:bluetooth'}"></ha-icon><div class="bt-name"><strong>${esc(current.name||current.mac)}</strong><small>${esc(current.mac)}</small><small>${type} · ${audio}</small>${selected?'<span class="badge">Đang làm đầu ra</span>':''}${blocked?'<small>A2DP tương ứng đang tắt trong cấu hình</small>':''}</div>${action?`<button data-bt-action="${action}" data-bt-mac="${esc(current.mac)}" ${disabled||blocked?'disabled':''}>${operation?.pending&&operation.mac===current.mac?'Đang xử lý…':esc(label)}</button>`:'<small>Chưa rõ chức năng âm thanh</small>'}</div>`;
-      };
-      const scanned=Array.isArray(attrs.scan_devices)?attrs.scan_devices.filter(d=>d&&d.mac&&!devices.some(current=>current.mac===d.mac&&current.connected)):[];
-      const progress=operation?`<div class="status-notice ${operation.error?'is-error':''}" role="status"><ha-icon icon="${operation.pending?'mdi:loading':operation.error?'mdi:alert-circle':'mdi:check-circle'}"></ha-icon><span>${esc(labels[operation.action]||operation.action)}${operation.name?' · '+esc(operation.name):''}<br>${esc(operation.pending?'Đang chờ loa xác nhận…':operation.error||'Đã được loa xác nhận.')}</span></div>`:'';
-      return `<p class="hint">Đầu ra hiện tại: <strong>${esc(attrs.output_mac?(attrs.output_name||connected.find(d=>d.mac===attrs.output_mac)?.name||attrs.output_mac):'Loa VBot')}</strong></p>${progress}<section class="media-panel"><h3>Thiết bị đang kết nối · ${connected.length}</h3>${connected.length?connected.map(d=>row(d,true)).join(''):'<p class="empty">Chưa có thiết bị Bluetooth đang kết nối.</p>'}</section>
-        <section class="media-panel"><div class="section-title"><h3>Tìm thiết bị Bluetooth</h3><button data-bt-action="scan" ${disabled?'disabled':''}><ha-icon icon="${busy?'mdi:loading':'mdi:magnify'}"></ha-icon> ${busy?'Đang xử lý…':'Quét thiết bị'}</button></div>${scanned.map(d=>row(d,false)).join('')}${!scanned.length?`<p class="empty">${attrs.scan_id?'Không có thiết bị chưa kết nối trong kết quả quét.':'Bật chế độ ghép đôi trên thiết bị rồi nhấn quét.'}</p>`:''}</section>`;
+      const switchActive=this._rows().find(e=>domain(e.entity_id)==='switch'&&(e.unique_id?.includes('bluetooth_active')||e.unique_id?.includes('_bluetooth_')));
+      const sensorConn=this._rows().find(e=>domain(e.entity_id)==='sensor'&&e.unique_id?.includes('bluetooth_connection'));
+      const sensorDevice=this._rows().find(e=>domain(e.entity_id)==='sensor'&&e.unique_id?.includes('bluetooth_device_name'));
+      const sensorPlaying=this._rows().find(e=>domain(e.entity_id)==='sensor'&&(e.unique_id?.includes('bluetooth_playing')||e.unique_id?.includes('bluetooth_audio')));
+      const sensorTitle=this._rows().find(e=>domain(e.entity_id)==='sensor'&&e.unique_id?.includes('bluetooth_title'));
+      const sensorArtist=this._rows().find(e=>domain(e.entity_id)==='sensor'&&e.unique_id?.includes('bluetooth_artist'));
+      const sensorAlbum=this._rows().find(e=>domain(e.entity_id)==='sensor'&&e.unique_id?.includes('bluetooth_album'));
+
+      const btnPlay=this._rows().find(e=>domain(e.entity_id)==='button'&&e.unique_id?.includes('bluetooth_play'));
+      const btnPause=this._rows().find(e=>domain(e.entity_id)==='button'&&e.unique_id?.includes('bluetooth_pause'));
+      const btnNext=this._rows().find(e=>domain(e.entity_id)==='button'&&e.unique_id?.includes('bluetooth_next'));
+      const btnPrev=this._rows().find(e=>domain(e.entity_id)==='button'&&e.unique_id?.includes('bluetooth_prev'));
+      const btnDisconnect=this._rows().find(e=>domain(e.entity_id)==='button'&&e.unique_id?.includes('bluetooth_disconnect'));
+      const btnPair=this._rows().find(e=>domain(e.entity_id)==='button'&&e.unique_id?.includes('bluetooth_pairing'));
+
+      const hasBt=Boolean(entity||switchActive||sensorConn||sensorDevice||btnPlay||btnDisconnect);
+      if(!hasBt)return '<p class="empty">Loa này chưa hỗ trợ quản lý Bluetooth. Cập nhật VBot và custom component.</p>';
+
+      let isConnected=false;
+      const connVal=sensorConn?String(this._hass.states[sensorConn.entity_id]?.state||'').trim().toLowerCase():'';
+      if(['connected','on','true','1','đã kết nối'].includes(connVal))isConnected=true;
+
+      let devName=sensorDevice&&!offline(this._hass.states[sensorDevice.entity_id])?String(this._hass.states[sensorDevice.entity_id].state||''):'';
+      if(!devName||['không kết nối','chưa kết nối','chưa có thiết bị','unknown','unavailable','n/a','none'].includes(devName.trim().toLowerCase()))devName='';
+
+      const playVal=sensorPlaying&&!offline(this._hass.states[sensorPlaying.entity_id])?String(this._hass.states[sensorPlaying.entity_id].state||'').trim().toLowerCase():'idle';
+      const isPlaying=playVal==='playing';
+      const isPaused=playVal==='paused';
+
+      const title=sensorTitle&&!offline(this._hass.states[sensorTitle.entity_id])?this._hass.states[sensorTitle.entity_id].state:'';
+      const artist=sensorArtist&&!offline(this._hass.states[sensorArtist.entity_id])?this._hass.states[sensorArtist.entity_id].state:'';
+      const album=sensorAlbum&&!offline(this._hass.states[sensorAlbum.entity_id])?this._hass.states[sensorAlbum.entity_id].state:'';
+
+      const switchState=switchActive&&!offline(this._hass.states[switchActive.entity_id])?this._hass.states[switchActive.entity_id].state==='on':true;
+      const switchDisabled=switchActive?this._disabled(switchActive):false;
+
+      const statusText=isPlaying?'Đang phát nhạc':isPaused?'Tạm dừng':isConnected?'Đã kết nối (Sẵn sàng)':'Chưa kết nối';
+      const statusIcon=isPlaying?'mdi:play-circle':isPaused?'mdi:pause-circle':isConnected?'mdi:bluetooth-connect':'mdi:bluetooth-off';
+
+      let selectHtml='';
+      if(entity){
+        const state=this._hass.states[entity.entity_id],attrs=state?.attributes||{};
+        if(!offline(state)){
+          const devices=Array.isArray(attrs.devices)?attrs.devices:[];
+          const connected=devices.filter(d=>d&&d.connected);
+          if(connected.length>0&&!devName){
+            isConnected=true;
+            devName=connected.map(d=>d.name||d.mac).join(', ');
+          }
+          const busy=this._busy.has(entity.entity_id),disabled=this._disabled(entity);
+          const operation=this._btOperations.get(this._selected);
+          const labels={scan:'Quét thiết bị',pair:'Ghép đôi',connect:'Kết nối loa/tai nghe',sink_connect:'Kết nối điện thoại',device_disconnect:'Ngắt kết nối'};
+          const row=(device,active)=>{
+            const current=devices.find(d=>d.mac===device.mac)||device;
+            const action=active?'device_disconnect':!current.paired?'pair':current.audio_sink?'connect':current.audio_source?'sink_connect':null;
+            const blocked=!active&&current.paired&&((current.audio_sink&&attrs.roles?.source===false)||(!current.audio_sink&&current.audio_source&&attrs.roles?.sink===false));
+            const label=active?'Ngắt kết nối':!current.paired?'Ghép đôi':'Kết nối';
+            const type=current.audio_sink&&current.audio_source?'Thiết bị âm thanh hai chiều':current.audio_sink?'Loa / tai nghe':current.audio_source?'Điện thoại / nguồn nhạc':'Thiết bị Bluetooth';
+            const selected=Boolean(attrs.output_mac&&attrs.output_mac===current.mac);
+            const audio=current.output_running||current.input_running?'Đang truyền âm thanh':current.output_connected||current.input_connected?'Đã kết nối âm thanh':active?'Đã kết nối Bluetooth':'Chưa kết nối';
+            return `<div class="bt-device ${selected?'bt-output':''}"><ha-icon icon="${current.audio_sink?'mdi:speaker-bluetooth':current.audio_source?'mdi:cellphone-sound':'mdi:bluetooth'}"></ha-icon><div class="bt-name"><strong>${esc(current.name||current.mac)}</strong><small>${esc(current.mac)}</small><small>${type} · ${audio}</small>${selected?'<span class="badge">Đang làm đầu ra</span>':''}${blocked?'<small>A2DP tương ứng đang tắt trong cấu hình</small>':''}</div>${action?`<button data-bt-action="${action}" data-bt-mac="${esc(current.mac)}" ${disabled||blocked?'disabled':''}>${operation?.pending&&operation.mac===current.mac?'Đang xử lý…':esc(label)}</button>`:'<small>Chưa rõ chức năng âm thanh</small>'}</div>`;
+          };
+          const scanned=Array.isArray(attrs.scan_devices)?attrs.scan_devices.filter(d=>d&&d.mac&&!devices.some(current=>current.mac===d.mac&&current.connected)):[];
+          const progress=operation?`<div class="status-notice ${operation.error?'is-error':''}" role="status"><ha-icon icon="${operation.pending?'mdi:loading':operation.error?'mdi:alert-circle':'mdi:check-circle'}"></ha-icon><span>${esc(labels[operation.action]||operation.action)}${operation.name?' · '+esc(operation.name):''}<br>${esc(operation.pending?'Đang chờ loa xác nhận…':operation.error||'Đã được loa xác nhận.')}</span></div>`:'';
+          selectHtml=`<section class="media-panel"><h3><ha-icon icon="mdi:speaker-bluetooth"></ha-icon> Thiết bị ngoại vi kết nối · ${connected.length}</h3>${connected.length?connected.map(d=>row(d,true)).join(''):'<p class="empty">Chưa có thiết bị nào đang kết nối trong danh sách thiết bị lưu.</p>'}</section>
+            <section class="media-panel"><div class="section-title"><h3><ha-icon icon="mdi:bluetooth-search"></ha-icon> Tìm thiết bị Bluetooth xung quanh</h3><button data-bt-action="scan" ${disabled?'disabled':''}><ha-icon icon="${busy?'mdi:loading':'mdi:magnify'}"></ha-icon> ${busy?'Đang xử lý…':'Quét thiết bị'}</button></div>${scanned.map(d=>row(d,false)).join('')}${!scanned.length?`<p class="empty">${attrs.scan_id?'Không có thiết bị chưa kết nối trong kết quả quét.':'Bật chế độ ghép đôi trên thiết bị rồi nhấn quét.'}</p>`:''}</section>`;
+        }
+      }
+
+      const playerPanel=`<section class="media-panel" style="margin-top:0;">
+        <div class="section-title">
+          <h3><ha-icon icon="mdi:bluetooth-audio"></ha-icon> Điều Khiển Nhạc Bluetooth</h3>
+          ${switchActive?`<button class="toggle ${switchState?'on':''}" data-toggle="${esc(switchActive.entity_id)}" ${switchDisabled?'disabled':''} style="font-size:12px;padding:5px 10px;"><ha-icon icon="${switchState?'mdi:bluetooth':'mdi:bluetooth-off'}"></ha-icon> ${switchState?'Đang bật':'Đang tắt'}</button>`:''}
+        </div>
+        <div class="bt-device" style="border-bottom:1px solid var(--divider-color);padding:10px 0;">
+          <ha-icon icon="${isConnected?'mdi:cellphone-sound':'mdi:bluetooth-off'}" style="color:${isConnected?'var(--accent)':'var(--secondary-text-color)'};--mdc-icon-size:28px;"></ha-icon>
+          <div class="bt-name">
+            <strong>${esc(devName||(isConnected?'Thiết bị Bluetooth':'Chưa có thiết bị kết nối'))}</strong>
+            <small><ha-icon icon="${statusIcon}" style="--mdc-icon-size:14px;vertical-align:middle;"></ha-icon> Trạng thái: <strong>${esc(statusText)}</strong></small>
+            ${title?`<small><ha-icon icon="mdi:music" style="--mdc-icon-size:14px;vertical-align:middle;"></ha-icon> Bài hát: <strong>${esc(title)}</strong></small>`:''}
+            ${artist?`<small><ha-icon icon="mdi:account-music" style="--mdc-icon-size:14px;vertical-align:middle;"></ha-icon> Nghệ sĩ: ${esc(artist)}</small>`:''}
+            ${album?`<small><ha-icon icon="mdi:album" style="--mdc-icon-size:14px;vertical-align:middle;"></ha-icon> Album: ${esc(album)}</small>`:''}
+          </div>
+          ${btnDisconnect&&isConnected?`<button data-quick="${esc(btnDisconnect.entity_id)}" data-quick-service="press" ${this._disabled(btnDisconnect)?'disabled':''} title="Ngắt kết nối thiết bị" style="font-size:12px;padding:8px 12px;color:var(--error-color);border-color:var(--error-color);"><ha-icon icon="mdi:bluetooth-off"></ha-icon> Ngắt</button>`:(btnPair?`<button data-quick="${esc(btnPair.entity_id)}" data-quick-service="press" ${this._disabled(btnPair)?'disabled':''} title="Mở ghép đôi" style="font-size:12px;padding:8px 12px;"><ha-icon icon="mdi:bluetooth-connect"></ha-icon> Ghép đôi</button>`:'')}
+        </div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-top:16px;">
+          ${btnPrev?`<button class="icon" data-quick="${esc(btnPrev.entity_id)}" data-quick-service="press" ${!isConnected||this._disabled(btnPrev)?'disabled':''} title="Bài trước" style="border:1px solid var(--divider-color);border-radius:50%;padding:10px;"><ha-icon icon="mdi:skip-backward"></ha-icon></button>`:''}
+          ${isPlaying&&btnPause?`<button class="icon primary-play" data-quick="${esc(btnPause.entity_id)}" data-quick-service="press" ${!isConnected||this._disabled(btnPause)?'disabled':''} title="Tạm dừng" style="background:var(--accent);color:#fff;border-radius:50%;padding:14px;"><ha-icon icon="mdi:pause"></ha-icon></button>`:(btnPlay?`<button class="icon primary-play" data-quick="${esc(btnPlay.entity_id)}" data-quick-service="press" ${!isConnected||this._disabled(btnPlay)?'disabled':''} title="Phát" style="background:var(--accent);color:#fff;border-radius:50%;padding:14px;"><ha-icon icon="mdi:play"></ha-icon></button>`:'')}
+          ${btnNext?`<button class="icon" data-quick="${esc(btnNext.entity_id)}" data-quick-service="press" ${!isConnected||this._disabled(btnNext)?'disabled':''} title="Bài tiếp" style="border:1px solid var(--divider-color);border-radius:50%;padding:10px;"><ha-icon icon="mdi:skip-forward"></ha-icon></button>`:''}
+        </div>
+      </section>`;
+
+      return playerPanel+selectHtml;
     }
     async _bluetoothAction(action,mac=''){
       const entity=this._findEntity('select','_bluetooth_output_select');
@@ -386,7 +457,7 @@
           <div class="times"><span data-elapsed="${id}">${this._time(position)}</span><span>${finiteDuration?this._time(duration):'Trực tiếp / Không có thời lượng'}</span></div></div>
         <div class="transport">${actions.filter(x=>(features&x[3])!==0).map(([action,icon,label])=>`<button class="icon ${action==='media_play'||action==='media_pause'?'primary-play':''}" data-media="${action}" data-entity="${id}" title="${label}" aria-label="${label}" ${disabled}><ha-icon icon="${icon}"></ha-icon></button>`).join('')}
           ${(features&8)!==0?`<button class="icon ${a.is_volume_muted?'muted-volume':''}" data-volume-mute="${id}" title="${a.is_volume_muted?'Bật âm thanh':'Tắt âm thanh loa'}" aria-label="${a.is_volume_muted?'Bật âm thanh':'Tắt âm thanh loa'}" aria-pressed="${!!a.is_volume_muted}" ${disabled}><ha-icon icon="${a.is_volume_muted?'mdi:volume-off':'mdi:volume-high'}"></ha-icon></button>`:''}</div>
-        ${this._mediaSettings(true)}
+        ${this._mediaSettings(true,row)}
         ${a.playlist_name?`<div class="playlist-caption"><ha-icon icon="mdi:playlist-music"></ha-icon>${esc(a.playlist_name)}${a.playlist_total?' · '+esc(Number(a.playlist_index??0)+1)+' / '+esc(a.playlist_total):''}</div>`:''}</div></section>`;
     }
     _image(value){
@@ -416,16 +487,19 @@
       const outputState=output&&this._hass.states[output.entity_id];
       const snapshot=outputState?.attributes;
       let count=0;
-      if(outputState&&!offline(outputState)&&outputState.state!=='unknown'&&Array.isArray(snapshot?.devices)){
+      if(outputState&&!offline(outputState)&&outputState.state!=='unknown'&&Array.isArray(snapshot?.devices)&&snapshot.devices.length>0){
         const connected=[...new Map(snapshot.devices.filter(d=>d?.connected&&d.mac).map(d=>[d.mac,d])).values()];
-        count=connected.length;bluetooth=count>0;
-        name=connected.map(d=>d.name||d.mac).join(', ');
+        if(connected.length>0){
+          count=connected.length;bluetooth=true;
+          name=connected.map(d=>d.name||d.mac).join(', ');
+        }
       }
+      if(bluetooth===true&&!count)count=1;
       const a=player.attributes;
       const multiroom=offline(player)?null:typeof a.multiroom_connected==='boolean'?a.multiroom_connected:Array.isArray(a.group_members)?a.group_members.length>1:null;
       const chip=(kind,connected,text,icon,tab='')=>`<${tab?'button type="button"':'div'} class="connection ${connected===true?'connected':connected===false?'disconnected':'unknown'}" data-connection="${kind}" ${tab?`data-tab="${tab}" aria-label="Xem các thiết bị Bluetooth đang kết nối"`:'role="status"'}><ha-icon icon="${icon}"></ha-icon><div><strong>${kind==='bluetooth'?'Bluetooth':'Multiroom'}</strong><span>${esc(text)}</span></div></${tab?'button':'div'}>`;
       const bluetoothText=count>2?`${count} thiết bị đang kết nối`:bluetooth===true?(name?'Đã kết nối · '+name:'Đã kết nối · Chưa có tên thiết bị'):bluetooth===false?'Chưa kết nối':'Chưa có trạng thái';
-      return `<div class="connection-status">${chip('bluetooth',bluetooth,bluetoothText,'mdi:bluetooth',count>0?'bluetooth':'')}${chip('multiroom',multiroom,multiroom===true?'Đã kết nối':multiroom===false?'Chưa kết nối':'Chưa có trạng thái','mdi:speaker-multiple')}</div>`;
+      return `<div class="connection-status">${chip('bluetooth',bluetooth,bluetoothText,'mdi:bluetooth','bluetooth')}${chip('multiroom',multiroom,multiroom===true?'Đã kết nối':multiroom===false?'Chưa kết nối':'Chưa có trạng thái','mdi:speaker-multiple')}</div>`;
     }
     _time(value){
       if(!Number.isFinite(value)||value<0)return '0:00';
@@ -475,12 +549,26 @@
       const selected=rows.filter(e=>(domain(e.entity_id)==='text'&&!e.unique_id?.endsWith('_vbot_tts'))||(domain(e.entity_id)==='button'&&suffixes.some(s=>e.unique_id?.endsWith(s))));
       return selected.length?`<details data-media-extras class="media-extras" ${this._extrasOpen?'open':''}><summary><ha-icon icon="mdi:message-text-outline"></ha-icon> Thông báo, URL nhạc và tác vụ mở rộng</summary>${this._group('Lưu nội dung rồi nhấn tác vụ tương ứng',selected)}</details>`:'';
     }
-    _mediaSettings(inline=false){
-      const volume=this._findEntity('number','_number_volume_state_number');
+    _mediaSettings(inline=false,playerRow=null){
+      const volume=this._findEntity('number','_number_volume_state_number')
+        || this._rows().find(e=>domain(e.entity_id)==='number'&&(e.unique_id?.endsWith('_volume_number')||/volume/i.test(e.unique_id||e.entity_id)));
       const source=this._findEntity('select','_media_source_select');
       const output=this._findEntity('select','_bluetooth_output_select');
-      if(!volume&&!source&&!output)return '';
-      return `<section class="${inline?'player-settings':'media-panel'}">${inline?'':'<h3><ha-icon icon="mdi:speaker-wireless"></ha-icon> Âm lượng và nguồn phát</h3>'}${volume?this._control(volume,'Âm lượng loa'):''}${source?this._control(source,'Chuyển nguồn phát đầu vào'):''}${output?this._control(output,'Chuyển nguồn phát đầu ra:'):''}</section>`;
+      let volControl='';
+      if(volume){
+        volControl=this._control(volume,'Âm lượng loa');
+      }else if(playerRow&&this._hass?.states[playerRow.entity_id]){
+        const ps=this._hass.states[playerRow.entity_id],pa=ps.attributes||{};
+        const pf=Number(pa.supported_features||0);
+        if((pf&4)!==0||pa.volume_level!==undefined){
+          const pId=esc(playerRow.entity_id);
+          const pDis=this._disabled(playerRow)?'disabled':'';
+          const pVol=Math.round((Number(pa.volume_level??0.5))*100);
+          volControl=`<div class="row"><button class="label" data-more="${pId}" title="${pId}">Âm lượng loa</button><div class="range"><input type="range" data-kind="player-volume" data-entity="${pId}" min="0" max="100" step="1" value="${pVol}" aria-label="Âm lượng loa" ${pDis}><output data-value="${pId}">${pVol} %</output></div></div>`;
+        }
+      }
+      if(!volControl&&!source&&!output)return '';
+      return `<section class="${inline?'player-settings':'media-panel'}">${inline?'':'<h3><ha-icon icon="mdi:speaker-wireless"></ha-icon> Âm lượng và nguồn phát</h3>'}${volControl}${source?this._control(source,'Chuyển nguồn phát đầu vào'):''}${output?this._control(output,'Chuyển nguồn phát đầu ra:'):''}</section>`;
     }
     _panelStart(key,title,icon,className='media-panel'){
       return `<details class="${className} fold-panel" data-fold="${key}" ${this._foldOpen[key]?'open':''}><summary><ha-icon icon="${icon}"></ha-icon><span>${title}</span><ha-icon class="fold-chevron" icon="mdi:chevron-down"></ha-icon></summary><div class="fold-body">`;
@@ -650,6 +738,7 @@
         const state=this._hass.states[t.dataset.entity],duration=Number(state?.attributes.media_duration),position=Number(t.value);
         if((Number(state?.attributes.supported_features||0)&2)&&Number.isFinite(duration)&&duration>0&&Number.isFinite(position))this._service(t.dataset.entity,'media_seek',{seek_position:Math.max(0,Math.min(duration,position))});
       }
+      if(t.dataset.kind==='player-volume'){this._service(t.dataset.entity,'set_volume_level',{volume_level:Number(t.value)/100});t.blur();return;}
       if(t.dataset.kind==='number')this._service(t.dataset.entity,'set_value',{value:Number(t.value)});
       if(t.dataset.kind==='select')this._service(t.dataset.entity,'select_option',{option:t.value});
       // Text is saved explicitly, so opening another tab never submits a draft.

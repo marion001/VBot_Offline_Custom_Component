@@ -69,6 +69,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             ("Máy Chủ Đang Kết Nối", "server_address", "mdi:server"),
             ("Trạng Thái Loa", "speaker_status", "mdi:speaker-message"),
             ("Trạng Thái mDNS", "mdns_status", "mdi:lan-connect"),
+            ("Trạng Thái Bluetooth", "bluetooth_enabled", "mdi:bluetooth"),
+            ("Trạng Thái Kết Nối Bluetooth", "bluetooth_connection", "mdi:bluetooth-connect"),
+            ("Thiết Bị Bluetooth Đang Kết Nối", "bluetooth_device_name", "mdi:bluetooth-audio"),
+            ("Bluetooth Đang Phát", "bluetooth_playing", "mdi:bluetooth-audio"),
+            ("Trạng Thái Âm Thanh Bluetooth", "bluetooth_audio", "mdi:volume-high"),
+            ("Tên Bài Bluetooth", "bluetooth_title", "mdi:music"),
+            ("Nghệ Sĩ Bluetooth", "bluetooth_artist", "mdi:account-music"),
+            ("Album Bluetooth", "bluetooth_album", "mdi:album"),
         ]
         sensors = [{
             "name": f"{label} ({device})",

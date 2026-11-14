@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .availability import MQTTAvailabilityMixin, set_vbot_device_online
-from .const import DEVICE_TYPE_ANDROID, DEVICE_TYPE_HOST
+from .const import DEVICE_TYPE_ANDROID, DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -61,7 +61,7 @@ async def async_setup_entry(
     """Set up supported VBot binary sensors."""
     runtime = entry.runtime_data
     descriptions = list(DESCRIPTIONS[:2])
-    if runtime.device_type in (DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID):
+    if runtime.device_type in (DEVICE_TYPE_HOST, DEVICE_TYPE_ANDROID, DEVICE_TYPE_ESP32):
         descriptions.append(DESCRIPTIONS[2])
     async_add_entities(
         VBotBinarySensor(hass, runtime.device_id, description)

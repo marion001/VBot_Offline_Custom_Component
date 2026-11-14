@@ -675,6 +675,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             if any(f"/switch/{name}/set" in item["command_topic"] for name in supported)
         ]
         switches.append({
+            "name": f"Bluetooth Active ({device})",
+            "state_topic": f"{device}/switch/bluetooth_active/state",
+            "command_topic": f"{device}/switch/bluetooth_active/set",
+            "payload_on": "ON", "payload_off": "OFF",
+            "state_on": "ON", "state_off": "OFF",
+            "optimistic": False, "qos": 1, "retain": True,
+            "icon": "mdi:bluetooth",
+        })
+        switches.append({
             "name": f"Hotword Stream ({device})",
             "state_topic": f"{device}/switch/hotword_stream/state",
             "command_topic": f"{device}/switch/hotword_stream/set",

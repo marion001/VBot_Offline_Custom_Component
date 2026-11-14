@@ -1,4 +1,4 @@
-"""MQTT-controlled RGB light for the host VBot LED strip."""
+"""MQTT-controlled RGB light for VBot host and ESP32 client LEDs."""
 
 from __future__ import annotations
 
@@ -12,13 +12,24 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 
 from .availability import MQTTAvailabilityMixin
-from .const import DEVICE_TYPE_HOST
+from .const import DEVICE_TYPE_ESP32, DEVICE_TYPE_HOST
 
 _LOGGER = logging.getLogger(__name__)
 _EFFECTS = {
     "solid": "Solid",
     "breathe": "Breathe",
+    "pulse": "Pulse",
     "color_loop": "Color Loop",
+    "rainbow": "Rainbow",
+    "color_wipe": "Color Wipe",
+    "chase": "Chase",
+    "theater_chase": "Theater Chase",
+    "twinkle": "Twinkle",
+    "sparkle": "Sparkle",
+    "scanner": "Scanner",
+    "fire": "Fire",
+    "candle": "Candle",
+    "strobe": "Strobe",
 }
 _EFFECTS_REVERSE = {label: value for value, label in _EFFECTS.items()}
 
@@ -27,7 +38,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     runtime = entry.runtime_data
-    if runtime.device_type != DEVICE_TYPE_HOST or not runtime.device_id:
+    if runtime.device_type not in (DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32) or not runtime.device_id:
         return
     async_add_entities([VBotLEDLight(hass, runtime.device_id)])
 

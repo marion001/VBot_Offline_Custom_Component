@@ -11,7 +11,7 @@ from homeassistant.core import callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN, DEVICE_TYPE_HOST
+from .const import DOMAIN, DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32
 from .availability import is_vbot_device_online
 
 ACTIONS = ('scan', 'pair', 'connect', 'sink_connect', 'device_disconnect')
@@ -29,7 +29,7 @@ async def async_bluetooth_command(hass, data, resolve):
     for device in devices:
         entries = hass.config_entries.async_entries(DOMAIN)
         if not any(getattr(getattr(entry, 'runtime_data', None), 'device_id', None) == device and
-                   getattr(getattr(entry, 'runtime_data', None), 'device_type', None) == DEVICE_TYPE_HOST for entry in entries):
+                   getattr(getattr(entry, 'runtime_data', None), 'device_type', None) in (DEVICE_TYPE_HOST, DEVICE_TYPE_ESP32) for entry in entries):
             raise ServiceValidationError('Thiết bị này không hỗ trợ quản lý Bluetooth')
         if not is_vbot_device_online(hass, device):
             raise ServiceValidationError('VBot đang ngoại tuyến')

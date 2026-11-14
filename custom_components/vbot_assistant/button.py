@@ -214,6 +214,50 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             "topic": f"{device}/script/button_control/set",
             "payload": "WAKEUP",
         })
+        buttons_config.extend([
+            {
+                "id": f"{device}_bluetooth_play",
+                "name": f"Phát Bluetooth ({device})",
+                "icon": "mdi:play",
+                "topic": f"{device}/script/bluetooth_control/set",
+                "payload": "PLAY",
+            },
+            {
+                "id": f"{device}_bluetooth_pause",
+                "name": f"Tạm Dừng Bluetooth ({device})",
+                "icon": "mdi:pause",
+                "topic": f"{device}/script/bluetooth_control/set",
+                "payload": "PAUSE",
+            },
+            {
+                "id": f"{device}_bluetooth_next",
+                "name": f"Bài Tiếp Bluetooth ({device})",
+                "icon": "mdi:skip-forward",
+                "topic": f"{device}/script/bluetooth_control/set",
+                "payload": "NEXT",
+            },
+            {
+                "id": f"{device}_bluetooth_prev",
+                "name": f"Bài Trước Bluetooth ({device})",
+                "icon": "mdi:skip-backward",
+                "topic": f"{device}/script/bluetooth_control/set",
+                "payload": "PREV",
+            },
+            {
+                "id": f"{device}_bluetooth_disconnect",
+                "name": f"Ngắt Kết Nối Bluetooth ({device})",
+                "icon": "mdi:bluetooth-off",
+                "topic": f"{device}/script/bluetooth_control/set",
+                "payload": "DISCONNECT",
+            },
+            {
+                "id": f"{device}_bluetooth_pairing",
+                "name": f"Mở Ghép Đôi Bluetooth ({device})",
+                "icon": "mdi:bluetooth-connect",
+                "topic": f"{device}/script/bluetooth_control/set",
+                "payload": "STATUS",
+            },
+        ])
     elif runtime.device_type == DEVICE_TYPE_ANDROID:
         supported_payloads = {
             "PAUSE", "STOP", "RESUME", "MEDIA_PLAY_DYNAMIC",

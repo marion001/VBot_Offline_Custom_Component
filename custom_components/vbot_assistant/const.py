@@ -38,7 +38,7 @@ DEVICE_TYPE_ESP32 = "esp32_client"
 
 HOST_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "select", "button", "text", "media_player", "light", "update"]
 ANDROID_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "button", "text", "media_player"]
-ESP32_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "button", "text", "media_player"]
+ESP32_PLATFORMS = ["switch", "number", "sensor", "binary_sensor", "button", "text", "media_player", "light"]
 
 
 def platforms_for_device(data: dict) -> list[str]:

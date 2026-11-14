@@ -2,8 +2,11 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
-Phiên bản hiện tại: `1.14.6`.
+Phiên bản hiện tại: `1.14.9`.
 
+- Bản **1.14.9** đồng bộ toàn diện tính năng điều khiển Media cho ESP32 Client tương đương Loa VBot Chủ: Mở rộng đầy đủ `supported_features` cho `media_player` ESP32 Client (Next, Previous, Play, Pause, Stop, Mute/Unmute, Volume Slider), tự động điều khiển đồng bộ cả Bluetooth từ ESP32 thường, Playlist thẻ nhớ lẫn luồng phát media trực tiếp qua MQTT.
+- Bản **1.14.8** nâng cấp toàn diện tab Bluetooth trên Lovelace Card (vbot-ultimate-card.js) cho cả ESP32 Client và Loa Chủ, tự động nhận diện thiết bị kết nối, hiển thị metadata thời gian thực và cụm nút điều khiển Bluetooth chuyên dụng.
+- Bản **1.14.7** thêm điều khiển LED RGB và hiệu ứng cho ESP32 VBot Client qua MQTT, đồng thời tạo entity Light trong Home Assistant.
 - Bản **1.14.6** gộp các lần đổi màu, độ sáng và hiệu ứng LED; chỉ gửi trạng thái sau 0,5 giây ngừng thao tác. Tắt LED vẫn được gửi ngay.
 
 - Bản **1.14.4** sửa tương thích tra cứu thiết bị trên Home Assistant 2026.8 và giữ nguyên đầu ra Bluetooth khi nhận kết quả scan. Cập nhật cả `Api_MQTT.py` và `VBot_MQTT.py` phía loa để nhận các sửa lỗi phản hồi lệnh và đồng bộ MQTT; nếu phát hành `.so`, cần build lại hai module này.
@@ -48,7 +51,7 @@ Nếu quản lý tài nguyên Lovelace bằng YAML, thêm hoặc cập nhật tr
 lovelace:
   resource_mode: yaml
   resources:
-    - url: /vbot_assistant/vbot-ultimate-card.js?v=1.14.6
+    - url: /vbot_assistant/vbot-ultimate-card.js?v=1.14.9
       type: module
 ```
 
@@ -62,7 +65,7 @@ Tab Điều khiển và Trạng thái có vùng cuộn riêng bằng chuột, c�
 
 Từ 1.12.8, cập nhật trạng thái giữ nguyên khung thẻ và phần tử cuộn trong DOM, không thay toàn bộ cây HTML sau mỗi sự kiện. Chỉ những nội dung/thuộc tính thay đổi được vá lại để không làm gián đoạn cuộn đang diễn ra.
 
-Từ 1.13.1, trong lúc cuộn thẻ/trang, bản vá DOM được hoãn đến khi dừng cuộn khoảng 0,6 giây, rồi áp dụng trạng thái mới nhất. Không chặn wheel/touch/scroll của trang, không gán lại scrollTop trong cập nhật thông thường, không ghi lại chiều cao nếu không đổi. Chỉ khôi phục vị trí đã nhớ khi chuyển tab hoặc loa. Có thể kiểm tra phiên bản JS thực sự đang nạp trong Console bằng `customElements.get('vbot-ultimate-card').version`; phiên bản này phải là `1.14.6`. Nếu còn bản cũ, kiểm tra resource trùng và tải lại hoàn toàn trang/ứng dụng HA.
+Từ 1.13.1, trong lúc cuộn thẻ/trang, bản vá DOM được hoãn đến khi dừng cuộn khoảng 0,6 giây, rồi áp dụng trạng thái mới nhất. Không chặn wheel/touch/scroll của trang, không gán lại scrollTop trong cập nhật thông thường, không ghi lại chiều cao nếu không đổi. Chỉ khôi phục vị trí đã nhớ khi chuyển tab hoặc loa. Có thể kiểm tra phiên bản JS thực sự đang nạp trong Console bằng `customElements.get('vbot-ultimate-card').version`; phiên bản này phải là `1.14.9`. Nếu còn bản cũ, kiểm tra resource trùng và tải lại hoàn toàn trang/ứng dụng HA.
 
 Loa chọn trong thẻ được giữ khi cập nhật trạng thái và được nhớ trên trình duyệt sau khi tải lại trang. Bộ nhớ tách theo tài khoản HA, trang và cấu hình thẻ; nếu có nhiều thẻ giống hệt nhau muốn nhớ loa riêng, đặt `storage_key` khác nhau cho từng thẻ. Nếu trình duyệt chặn localStorage, lựa chọn vẫn giữ trong phiên hiện tại. Không tự chuyển sang loa khác nếu loa đã chọn tạm mất kết nối.
 

@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.14.9 — 14-11-2026
+
+- **Đồng bộ toàn diện tính năng điều khiển Media cho ESP32 Client tương đương Loa VBot Chủ**:
+  - Mở rộng đầy đủ `supported_features` cho `media_player` ESP32 Client: Hỗ trợ các nút `Bài trước` (Previous), `Phát / Tạm dừng` (Play / Pause), `Dừng` (Stop), `Bài tiếp` (Next) và `Tắt/Bật tiếng` (Mute / Unmute).
+  - Tích hợp thanh trượt chỉnh Volume mượt mà trực tiếp trên giao diện trình phát nhạc của ESP32 Client (hỗ trợ cả qua entity `number` lẫn fallback qua `media_player.set_volume_level`).
+  - Nâng cấp các hàm `async_media_play`, `async_media_pause`, `async_media_stop`, `async_media_next_track`, `async_media_previous_track` tự động điều khiển đồng bộ cả Bluetooth từ ESP32 thường, Playlist thẻ nhớ lẫn luồng phát media trực tiếp qua MQTT.
+  - Hỗ trợ chức năng tắt/bật âm thanh (Mute/Unmute) thông minh cho ESP32 Client: tự động ghi nhớ và khôi phục mức âm lượng trước khi tắt tiếng.
+
+## 1.14.8 — 14-11-2026
+
+- **Nâng cấp toàn diện tab Bluetooth trên Lovelace Card (vbot-ultimate-card.js)**:
+  - Tự động nhận diện và hiển thị bảng điều khiển nhạc Bluetooth cho cả ESP32 Client và Host Linux/Android.
+  - Khắc phục triệt để thông báo "Loa này chưa hỗ trợ quản lý Bluetooth. Cập nhật VBot và custom component".
+  - Hiển thị chi tiết tên thiết bị kết nối ("iPhone của Tuyển"), trạng thái phát nhạc, Tên bài hát, Nghệ sĩ, Album.
+  - Tích hợp cụm nút điều khiển: Bài trước, Phát / Tạm dừng, Bài tiếp, Ngắt kết nối và Ghép đôi.
+  - Khắc phục lỗi đè trạng thái Bluetooth trong chip trạng thái tab Media.
+- **Bổ sung các nút bấm điều khiển Bluetooth cho ESP32 Client (button.py)**:
+  - Thêm các entity nút: bluetooth_play, bluetooth_pause, bluetooth_next, bluetooth_prev, bluetooth_disconnect, bluetooth_pairing qua topic MQTT.
+
+## 1.14.7
+
+- Thêm entity `light` LED Effects Control cho ESP32 VBot Client qua MQTT; dùng chung màu RGB, độ sáng và hệ thống 14 hiệu ứng: Solid, Breathe, Pulse, Color Loop, Rainbow, Color Wipe, Chase, Theater Chase, Twinkle, Sparkle, Scanner, Fire, Candle, Strobe.
+
 ## 1.14.6
 
 - Gộp thay đổi màu, độ sáng và hiệu ứng LED; chỉ gửi lệnh sau 0,5 giây người dùng ngừng thao tác. Lệnh tắt LED được gửi ngay và hủy cập nhật đang chờ.

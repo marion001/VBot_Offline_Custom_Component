@@ -77,9 +77,14 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         self._attr_unique_id = f"{device.lower()}_media_player"
         self._attr_state = MediaPlayerState.IDLE
         self._attr_supported_features = (
-            MediaPlayerEntityFeature.STOP
+            MediaPlayerEntityFeature.PLAY
+            | MediaPlayerEntityFeature.PAUSE
+            | MediaPlayerEntityFeature.STOP
             | MediaPlayerEntityFeature.PLAY_MEDIA
             | MediaPlayerEntityFeature.VOLUME_SET
+            | MediaPlayerEntityFeature.VOLUME_MUTE
+            | MediaPlayerEntityFeature.NEXT_TRACK
+            | MediaPlayerEntityFeature.PREVIOUS_TRACK
             if esp32_profile else
             MediaPlayerEntityFeature.PLAY
             | MediaPlayerEntityFeature.PAUSE
@@ -301,6 +306,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         self._attr_media_artist = payload.get("artist")
         self._attr_media_album_name = payload.get("album")
         self._media_url = payload.get("media_url")
+        self._connected_device = payload.get("connected_device")
         cover = str(payload.get("cover") or "").strip()
         active_state = self._attr_state in (MediaPlayerState.PLAYING, MediaPlayerState.PAUSED)
         if cover:
@@ -483,6 +489,14 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False
         )
+        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+            await mqtt.async_publish(
+                self._hass,
+                f"{self._device}/script/bluetooth_control/set",
+                "PAUSE",
+                qos=1,
+                retain=False
+            )
         self._attr_state = MediaPlayerState.IDLE
         self.async_write_ha_state()
 
@@ -495,12 +509,28 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False
         )
+        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+            await mqtt.async_publish(
+                self._hass,
+                f"{self._device}/script/bluetooth_control/set",
+                "PAUSE",
+                qos=1,
+                retain=False
+            )
         self._attr_state = MediaPlayerState.PAUSED
         self.async_write_ha_state()
 
     async def async_media_play(self):
         # Khi loa đang rảnh thì không có phiên media để resume. Cả loa chủ và
         # Phicomm R1 đều phát playlist mặc định khi người dùng nhấn Play.
+        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+            await mqtt.async_publish(
+                self._hass,
+                f"{self._device}/script/bluetooth_control/set",
+                "PLAY",
+                qos=1,
+                retain=False
+            )
         if self._attr_state == MediaPlayerState.IDLE:
             topic = f"{self._device}/script/playlist_control/set"
             payload = "PLAY"
@@ -522,6 +552,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         if not math.isfinite(volume):
             raise ValueError('Volume must be finite')
         value = round(max(0.0, min(1.0, volume)) * 100)
+        self._attr_volume_level = max(0.0, min(1.0, volume))
         await mqtt.async_publish(
             self._hass,
             f"{self._device}/number/volume/set",
@@ -529,8 +560,17 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False,
         )
+        self.async_write_ha_state()
 
     async def async_mute_volume(self, mute: bool) -> None:
+        self._attr_is_volume_muted = mute
+        if mute:
+            if self._attr_volume_level is not None and self._attr_volume_level > 0:
+                self._unmute_volume = self._attr_volume_level
+            await self.async_set_volume_level(0.0)
+        else:
+            restore_vol = getattr(self, "_unmute_volume", 0.5)
+            await self.async_set_volume_level(restore_vol)
         await mqtt.async_publish(
             self._hass,
             f"{self._device}/script/volume_control/set",
@@ -538,6 +578,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False,
         )
+        self.async_write_ha_state()
 
     async def async_media_seek(self, position: float) -> None:
         if not math.isfinite(position):
@@ -553,12 +594,22 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             self._hass, f"{self._device}/script/playlist_control/set",
             "next", qos=1, retain=False
         )
+        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+            await mqtt.async_publish(
+                self._hass, f"{self._device}/script/bluetooth_control/set",
+                "NEXT", qos=1, retain=False
+            )
 
     async def async_media_previous_track(self) -> None:
         await mqtt.async_publish(
             self._hass, f"{self._device}/script/playlist_control/set",
             "prev", qos=1, retain=False
         )
+        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+            await mqtt.async_publish(
+                self._hass, f"{self._device}/script/bluetooth_control/set",
+                "PREV", qos=1, retain=False
+            )
 
     @property
     def extra_state_attributes(self):
@@ -579,6 +630,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             "multiroom_coordinator": self._multiroom.get("coordinator_name") or self._multiroom.get("coordinator_host"),
             "multiroom_has_media": bool(self._multiroom.get("has_media")),
             "multiroom_paused": bool(self._multiroom.get("paused")),
+            "connected_device": getattr(self, "_connected_device", None),
         }
 
     @property
