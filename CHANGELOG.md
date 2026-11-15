@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.16.0 — 15-11-2026
+
+- Khắc phục đồng bộ Media Player với DLNA Renderer: giữ title, nghệ sĩ, album, ảnh bìa, thời lượng và vị trí phát trong MQTT.
+- Bổ sung nguồn DLNA Renderer vào select nguồn phát khi có phiên hoạt động.
+- Hỗ trợ tua DLNA và Next/Previous động theo capability do renderer công bố.
+- Gửi lệnh Next/Previous tới VBot qua MQTT khi nguồn DLNA đang phát; nút chỉ khả dụng khi renderer có bài kế tiếp hoặc lịch sử bài trước.
+
 ## 1.14.9 — 14-11-2026
 
 - **Đồng bộ toàn diện tính năng điều khiển Media cho ESP32 Client tương đương Loa VBot Chủ**:

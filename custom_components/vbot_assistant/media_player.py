@@ -102,6 +102,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
                 | MediaPlayerEntityFeature.BROWSE_MEDIA
                 | MediaPlayerEntityFeature.SEARCH_MEDIA
             )
+        self._base_supported_features = self._attr_supported_features
         self._media_title = None
         self._media_url = None
         self._attr_available = False
@@ -116,6 +117,7 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         self._source_kind = None
         self._multiroom = {}
         self._is_host_device = use_host_default_cover
+        self._is_esp32_profile = esp32_profile
         self._default_cover_url = _LOCAL_LOGO_URL
 
     async def async_added_to_hass(self) -> None:
@@ -290,6 +292,8 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         state_mapping = {
             "playing": MediaPlayerState.PLAYING,
             "paused": MediaPlayerState.PAUSED,
+            "paused_playback": MediaPlayerState.PAUSED,
+            "stopped": MediaPlayerState.IDLE,
             "idle": MediaPlayerState.IDLE,
         }
         self._attr_state = state_mapping.get(state, MediaPlayerState.IDLE)
@@ -317,6 +321,22 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             self._attr_media_image_url = self._default_cover_url
         self._attr_source = payload.get("source")
         self._source_kind = incoming_source_kind
+        features = self._base_supported_features
+        self._dlna_can_next = bool(
+            incoming_source_kind == "dlna" and active_state
+            and payload.get("dlna_can_next", payload.get("can_next", False))
+        )
+        self._dlna_can_previous = bool(
+            incoming_source_kind == "dlna" and active_state
+            and payload.get("dlna_can_previous", payload.get("can_previous", False))
+        )
+        if incoming_source_kind == "dlna":
+            features &= ~(MediaPlayerEntityFeature.NEXT_TRACK | MediaPlayerEntityFeature.PREVIOUS_TRACK)
+            if self._dlna_can_next:
+                features |= MediaPlayerEntityFeature.NEXT_TRACK
+            if self._dlna_can_previous:
+                features |= MediaPlayerEntityFeature.PREVIOUS_TRACK
+        self._attr_supported_features = features
         self._playlist_active = bool(payload.get("playlist_active"))
         self._playlist_id = payload.get("playlist_id")
         self._playlist_name = payload.get("playlist_name")
@@ -489,7 +509,9 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False
         )
-        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+        if not self._is_esp32_profile and (
+            self._source_kind == "bluetooth" or getattr(self, "_connected_device", None)
+        ):
             await mqtt.async_publish(
                 self._hass,
                 f"{self._device}/script/bluetooth_control/set",
@@ -509,7 +531,9 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
             qos=1,
             retain=False
         )
-        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+        if not self._is_esp32_profile and (
+            self._source_kind == "bluetooth" or getattr(self, "_connected_device", None)
+        ):
             await mqtt.async_publish(
                 self._hass,
                 f"{self._device}/script/bluetooth_control/set",
@@ -521,9 +545,22 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_media_play(self):
+        if self._source_kind == "dlna":
+            await mqtt.async_publish(
+                self._hass,
+                f"{self._device}/script/media_control/set",
+                "RESUME",
+                qos=1,
+                retain=False,
+            )
+            self._attr_state = MediaPlayerState.PLAYING
+            self.async_write_ha_state()
+            return
         # Khi loa đang rảnh thì không có phiên media để resume. Cả loa chủ và
         # Phicomm R1 đều phát playlist mặc định khi người dùng nhấn Play.
-        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+        if not self._is_esp32_profile and (
+            self._source_kind == "bluetooth" or getattr(self, "_connected_device", None)
+        ):
             await mqtt.async_publish(
                 self._hass,
                 f"{self._device}/script/bluetooth_control/set",
@@ -590,22 +627,44 @@ class VBotMediaPlayer(MQTTAvailabilityMixin, MediaPlayerEntity):
         )
 
     async def async_media_next_track(self) -> None:
+        if self._source_kind == "dlna":
+            if not getattr(self, "_dlna_can_next", False):
+                _LOGGER.debug("Bỏ qua Next DLNA vì renderer chưa báo có NextURI")
+                return
+            await mqtt.async_publish(
+                self._hass, f"{self._device}/script/media_control/set",
+                json.dumps({"action": "next"}), qos=1, retain=False
+            )
+            return
         await mqtt.async_publish(
             self._hass, f"{self._device}/script/playlist_control/set",
             "next", qos=1, retain=False
         )
-        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+        if not self._is_esp32_profile and (
+            self._source_kind == "bluetooth" or getattr(self, "_connected_device", None)
+        ):
             await mqtt.async_publish(
                 self._hass, f"{self._device}/script/bluetooth_control/set",
                 "NEXT", qos=1, retain=False
             )
 
     async def async_media_previous_track(self) -> None:
+        if self._source_kind == "dlna":
+            if not getattr(self, "_dlna_can_previous", False):
+                _LOGGER.debug("Bỏ qua Previous DLNA vì renderer chưa báo có bài trước")
+                return
+            await mqtt.async_publish(
+                self._hass, f"{self._device}/script/media_control/set",
+                json.dumps({"action": "previous"}), qos=1, retain=False
+            )
+            return
         await mqtt.async_publish(
             self._hass, f"{self._device}/script/playlist_control/set",
             "prev", qos=1, retain=False
         )
-        if self._source_kind == "bluetooth" or getattr(self, "_connected_device", None):
+        if not self._is_esp32_profile and (
+            self._source_kind == "bluetooth" or getattr(self, "_connected_device", None)
+        ):
             await mqtt.async_publish(
                 self._hass, f"{self._device}/script/bluetooth_control/set",
                 "PREV", qos=1, retain=False

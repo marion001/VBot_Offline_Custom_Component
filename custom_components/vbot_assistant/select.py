@@ -314,6 +314,7 @@ class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
         self._attr_current_option = None
         self._phone_options = {}
         self._media_snapshot = {}
+        self._source_options = dict(self._sources)
         self._input_mac = None
 
     @property
@@ -361,13 +362,17 @@ class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
                 label += ' (' + mac + ')'
             self._phone_options[label] = mac
         self._input_mac = payload.get('input_selected')
-        self._attr_options = [label for label in self._sources if label != 'Bluetooth' or not phones]
-        self._attr_options[1:1] = list(self._phone_options)
         self._update_current()
         self.async_write_ha_state()
 
     def _update_current(self):
         payload = self._media_snapshot
+        sources = dict(self._sources)
+        if payload.get('dlna_session_active'):
+            sources['DLNA Renderer'] = 'dlna'
+        self._source_options = sources
+        self._attr_options = [label for label in sources if label != 'Bluetooth' or not self._phone_options]
+        self._attr_options[1:1] = list(self._phone_options)
         source = payload.get('source_kind')
         if payload.get('selected_source') == 'bluetooth' and payload.get('state') != 'playing':
             source = 'bluetooth'
@@ -375,7 +380,7 @@ class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
             mac = self._input_mac or payload.get('bluetooth_input_mac')
             self._attr_current_option = next((label for label, value in self._phone_options.items() if value == mac), None)
         else:
-            self._attr_current_option = next((label for label, value in self._sources.items() if source == value), None)
+            self._attr_current_option = next((label for label, value in self._source_options.items() if source == value), None)
 
     @callback
     def _control_result_received(self, message):
@@ -413,9 +418,9 @@ class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
         self.async_write_ha_state()
 
     async def async_select_option(self, option):
-        if option not in self._sources and option not in self._phone_options:
+        if option not in self._source_options and option not in self._phone_options:
             raise ValueError(f'Tùy chọn không hợp lệ: {option}')
-        command = {'action': 'select_source', 'source': 'bluetooth' if option in self._phone_options else self._sources[option]}
+        command = {'action': 'select_source', 'source': 'bluetooth' if option in self._phone_options else self._source_options[option]}
         if option in self._phone_options:
             command['bluetooth_mac'] = self._phone_options[option]
         await mqtt.async_publish(self._hass, f'{self._device}/script/media_control/set',
