@@ -321,6 +321,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             {"id": f"{device}_multiroom_pause", "name": f"Tạm Dừng Multiroom ({device})", "icon": "mdi:pause", "topic": f"{device}/script/multiroom_control/set", "payload": '{"action":"pause"}'},
             {"id": f"{device}_multiroom_resume", "name": f"Tiếp Tục Multiroom ({device})", "icon": "mdi:play", "topic": f"{device}/script/multiroom_control/set", "payload": '{"action":"resume"}'},
             {"id": f"{device}_multiroom_stop", "name": f"Ngắt Kết Nối Multiroom ({device})", "icon": "mdi:speaker-off", "topic": f"{device}/script/multiroom_control/set", "payload": '{"action":"stop"}'},
+            {
+                "id": f"{device}_hass_json_sync",
+                "name": f"Đồng Bộ Home_Assistant.json ({device})",
+                "icon": "mdi:home-assistant",
+                "topic": f"{device}/script/state_sync/set",
+                "payload": "SYNC_HASS_JSON",
+            },
         ])
     entities = []
     for btn in buttons_config:

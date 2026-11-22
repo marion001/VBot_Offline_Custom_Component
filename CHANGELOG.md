@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.16.1 — 22-11-2026
+
+- Bổ sung nút **Đồng Bộ `Home_Assistant.json`** (`button.{device}_hass_json_sync`) cho loa chủ VBot (`Linux/Raspberry Pi`), gửi lệnh `SYNC_HASS_JSON` qua topic MQTT `{device}/script/state_sync/set` để làm mới danh sách thực thể Home Assistant trên VBot ngay từ Home Assistant hoặc Automation định kỳ.
+
 ## 1.16.0 — 15-11-2026
 
 - Khắc phục đồng bộ Media Player với DLNA Renderer: giữ title, nghệ sĩ, album, ảnh bìa, thời lượng và vị trí phát trong MQTT.

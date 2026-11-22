@@ -2,7 +2,7 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
-Phiên bản hiện tại: `1.16.0`.
+Phiên bản hiện tại: `1.16.1`.
 
 - Bản **1.14.9** đồng bộ toàn diện tính năng điều khiển Media cho ESP32 Client tương đương Loa VBot Chủ: Mở rộng đầy đủ `supported_features` cho `media_player` ESP32 Client (Next, Previous, Play, Pause, Stop, Mute/Unmute, Volume Slider), tự động điều khiển đồng bộ cả Bluetooth từ ESP32 thường, Playlist thẻ nhớ lẫn luồng phát media trực tiếp qua MQTT.
 - Bản **1.14.8** nâng cấp toàn diện tab Bluetooth trên Lovelace Card (vbot-ultimate-card.js) cho cả ESP32 Client và Loa Chủ, tự động nhận diện thiết bị kết nối, hiển thị metadata thời gian thực và cụm nút điều khiển Bluetooth chuyên dụng.
@@ -51,7 +51,7 @@ Nếu quản lý tài nguyên Lovelace bằng YAML, thêm hoặc cập nhật tr
 lovelace:
   resource_mode: yaml
   resources:
-    - url: /vbot_assistant/vbot-ultimate-card.js?v=1.16.0
+    - url: /vbot_assistant/vbot-ultimate-card.js?v=1.16.1
       type: module
 ```
 

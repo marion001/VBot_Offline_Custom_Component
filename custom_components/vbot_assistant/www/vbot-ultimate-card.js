@@ -91,7 +91,7 @@
     getCardSize(){return 9;}
     getGridOptions(){return {columns:12,rows:'auto',min_columns:6};}
     static getStubConfig(){return {type:'custom:vbot-ultimate-card',title:'VBot Ultimate'};}
-    static get version(){return '1.16.0';}
+    static get version(){return '1.16.1';}
     static getConfigElement(){return document.createElement('vbot-ultimate-card-editor');}
     async _loadRegistry(){
       if(this._loading||!this._hass)return;
