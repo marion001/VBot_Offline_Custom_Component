@@ -2,8 +2,11 @@
 
 Custom component kết nối một hoặc nhiều loa VBot với Home Assistant qua MQTT và API.
 
-Phiên bản hiện tại: `1.16.1`.
+Phiên bản hiện tại: `1.17.0`.
 
+- Bản **1.17.0** tích hợp nguồn phát **Spotify Connect** (`spotify`) vào `select` **Nguồn Phát Media / Chuyển nguồn phát đầu vào** và đồng bộ đầy đủ `media_player` qua MQTT (hiển thị tên bài hát, nghệ sĩ, album, ảnh bìa, thời lượng, vị trí phát, trạng thái `muted`, tua bài `Seek`, `Play/Resume`, `Pause`, `Stop`, `Next`, `Previous`).
+- Bản **1.16.1** bổ sung nút **Đồng Bộ `Home_Assistant.json`** (`button.{device}_hass_json_sync`) cho loa chủ VBot để làm mới danh sách thực thể ngay từ Home Assistant hoặc Automation.
+- Bản **1.16.0** đồng bộ Media Player với **DLNA Renderer** (metadata, ảnh bìa, tua bài, Next/Previous theo capability và chọn nguồn khi có phiên hoạt động).
 - Bản **1.14.9** đồng bộ toàn diện tính năng điều khiển Media cho ESP32 Client tương đương Loa VBot Chủ: Mở rộng đầy đủ `supported_features` cho `media_player` ESP32 Client (Next, Previous, Play, Pause, Stop, Mute/Unmute, Volume Slider), tự động điều khiển đồng bộ cả Bluetooth từ ESP32 thường, Playlist thẻ nhớ lẫn luồng phát media trực tiếp qua MQTT.
 - Bản **1.14.8** nâng cấp toàn diện tab Bluetooth trên Lovelace Card (vbot-ultimate-card.js) cho cả ESP32 Client và Loa Chủ, tự động nhận diện thiết bị kết nối, hiển thị metadata thời gian thực và cụm nút điều khiển Bluetooth chuyên dụng.
 - Bản **1.14.7** thêm điều khiển LED RGB và hiệu ứng cho ESP32 VBot Client qua MQTT, đồng thời tạo entity Light trong Home Assistant.
@@ -51,7 +54,7 @@ Nếu quản lý tài nguyên Lovelace bằng YAML, thêm hoặc cập nhật tr
 lovelace:
   resource_mode: yaml
   resources:
-    - url: /vbot_assistant/vbot-ultimate-card.js?v=1.16.1
+    - url: /vbot_assistant/vbot-ultimate-card.js?v=1.17.0
       type: module
 ```
 
@@ -308,10 +311,10 @@ VBot_Phong_Khach
 
 ### Chọn nguồn phát
 
-Thiết bị Host có select **Nguồn Phát Media** với Local / VBot, Bluetooth, Multiroom Audio và
-AirPlay. Select gửi JSON `{"action":"select_source","source":"bluetooth"}`
+Thiết bị Host có select **Nguồn Phát Media** với Local / VBot, Bluetooth, AirPlay, Multiroom Audio,
+Spotify Connect và DLNA Renderer (khi có phiên). Select gửi JSON `{"action":"select_source","source":"bluetooth"}`
 qua `<device>/script/media_control/set` (QoS 1, không retained). Các mã nguồn
-khác là `local_media`, `airplay` và `multiroom`.
+khác là `local_media`, `airplay`, `multiroom`, `spotify` và `dlna`.
 
 Lựa chọn hiện tại lấy từ `<device>/media_player/state`, không tự xác nhận thành
 công ngay sau khi gửi lệnh. Khi idle hoặc đang phát TTS, select có

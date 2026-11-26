@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.17.0 — 26-11-2026
+
+- Bổ sung nguồn **Spotify Connect** (`spotify`) vào `select.{device}_media_source_select` (**Nguồn Phát Media / Chuyển nguồn phát đầu vào**) để chọn và khôi phục phiên Spotify Connect qua MQTT.
+- Đồng bộ đầy đủ `media_player` với Spotify Connect (`go-librespot` qua bus chung `vbot_aec_media`): hiển thị tên bài hát, nghệ sĩ, album, ảnh bìa, thời lượng, vị trí phát, trạng thái tắt tiếng (`muted`), hỗ trợ tua bài (`Seek`), `Play/Resume`, `Pause`, `Stop` và gửi lệnh `Next` / `Previous` trực tiếp qua `{device}/script/media_control/set`.
+
 ## 1.16.1 — 22-11-2026
 
 - Bổ sung nút **Đồng Bộ `Home_Assistant.json`** (`button.{device}_hass_json_sync`) cho loa chủ VBot (`Linux/Raspberry Pi`), gửi lệnh `SYNC_HASS_JSON` qua topic MQTT `{device}/script/state_sync/set` để làm mới danh sách thực thể Home Assistant trên VBot ngay từ Home Assistant hoặc Automation định kỳ.

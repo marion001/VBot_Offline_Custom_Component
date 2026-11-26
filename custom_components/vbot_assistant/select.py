@@ -302,7 +302,13 @@ class MQTTSelect(MQTTAvailabilityMixin, SelectEntity):
 class VBotMediaSourceSelect(MQTTAvailabilityMixin, SelectEntity):
     """Choose playback over MQTT; state comes only from the actual media snapshot."""
 
-    _sources = {'Local / VBot': 'local_media', 'Bluetooth': 'bluetooth', 'AirPlay': 'airplay', 'Multiroom Audio': 'multiroom'}
+    _sources = {
+        'Local / VBot': 'local_media',
+        'Bluetooth': 'bluetooth',
+        'AirPlay': 'airplay',
+        'Multiroom Audio': 'multiroom',
+        'Spotify Connect': 'spotify',
+    }
 
     def __init__(self, hass, device):
         self._hass = hass

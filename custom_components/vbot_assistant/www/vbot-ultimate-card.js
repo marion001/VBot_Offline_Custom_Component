@@ -91,7 +91,7 @@
     getCardSize(){return 9;}
     getGridOptions(){return {columns:12,rows:'auto',min_columns:6};}
     static getStubConfig(){return {type:'custom:vbot-ultimate-card',title:'VBot Ultimate'};}
-    static get version(){return '1.16.1';}
+    static get version(){return '1.17.0';}
     static getConfigElement(){return document.createElement('vbot-ultimate-card-editor');}
     async _loadRegistry(){
       if(this._loading||!this._hass)return;
@@ -232,7 +232,7 @@
       const groups={network:[],audio:[],system:[]},alerts=[];
       for(const row of rows.filter(e=>['sensor','binary_sensor','event','update'].includes(domain(e.entity_id)))){
         const key=(row.unique_id||row.entity_id).toLowerCase(),state=this._hass.states[row.entity_id];
-        const group=/bluetooth|airplay|playback|audio|tts|wakeword|microphone|multiroom|volume/.test(key)?'audio':/wifi|wi_fi|ip_address|mqtt|mdns|server_|network|connectivity/.test(key)?'network':'system';
+        const group=/bluetooth|airplay|dlna|spotify|playback|audio|tts|wakeword|microphone|multiroom|volume/.test(key)?'audio':/wifi|wi_fi|ip_address|mqtt|mdns|server_|network|connectivity/.test(key)?'network':'system';
         groups[group].push(row);
         if(!state||offline(state))continue;
         const value=String(state.state).toLowerCase(),kind=domain(row.entity_id);
